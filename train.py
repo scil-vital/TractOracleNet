@@ -6,6 +6,7 @@ import torch
 
 from argparse import RawTextHelpFormatter
 from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.tuner import Tuner
 from torch.utils.data import DataLoader, random_split
 
 from feedforwardmodel import FeedForwardOracle
@@ -51,31 +52,47 @@ class TractOracleTraining():
         """
         """
         len_train = len(train_dataset)
-        print(len_train)
+
+        train_split, valid_split = int(len_train*0.8), int(len_train*0.2)+1
+
         train_data, val_data = random_split(train_dataset,
-                                            [int(len_train*0.8),
-                                             int(len_train*0.2)])
+                                            [train_split, valid_split])
 
         train_loader = DataLoader(train_data,
-                                  num_workers=self.num_workers,
-                                  batch_size=self.batch_size,
-                                  prefetch_factor=1,
-                                  persistent_workers=True
-                                  if self.num_workers > 0 else False,
-                                  pin_memory=True)
+                                  num_workers=self.num_workers)
+        # batch_size=self.batch_size,
+        # prefetch_factor=1,
+        # persistent_workers=True
+        # if self.num_workers > 0 else False,
+        # pin_memory=True)
 
         valid_loader = DataLoader(val_data,
-                                  num_workers=self.num_workers,
-                                  batch_size=self.batch_size,
-                                  prefetch_factor=1,
-                                  persistent_workers=True
-                                  if self.num_workers > 0 else False,
-                                  pin_memory=True)
+                                  num_workers=self.num_workers)
+        # batch_size=self.batch_size,
+        # prefetch_factor=1,
+        # persistent_workers=True
+        # if self.num_workers > 0 else False,
+        # pin_memory=True)
+
+        # using LightningDataModule
+
+        class LitDataModule(pl.LightningDataModule):
+            def __init__(self, batch_size):
+                super().__init__()
+                self.batch_size = batch_size
+
+                def train_dataloader(self):
+                    return DataLoader(
+                        train_data, batch_size=self.batch_size)
 
         # training
-
         logger = TensorBoardLogger("tb_logs", name="my_model")
-        trainer = pl.Trainer(log_every_n_steps=1, logger=logger)
+        trainer = pl.Trainer(log_every_n_steps=1, logger=logger,
+                             num_sanity_val_steps=0)
+        tuner = Tuner(trainer)
+
+        # Auto-scale batch size by growing it exponentially (default)
+        tuner.scale_batch_size(model, mode="power")
 
         trainer.fit(model, train_loader, valid_loader)
 

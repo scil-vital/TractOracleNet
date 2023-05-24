@@ -8,6 +8,7 @@ import numpy as np
 
 from argparse import RawTextHelpFormatter
 from os.path import join
+from tqdm import tqdm
 
 from dipy.io.streamline import load_tractogram
 from dipy.tracking.streamline import set_number_of_points
@@ -175,14 +176,13 @@ def process_all_streamlines(
     """
     print('Processing streamlines')
 
-    for bundle in streamlines_files:
+    for bundle in tqdm(streamlines_files):
         process_bundle(path, bundle, hdf_subject, reference, nb_points)
 
 
 def process_bundle(
     path, f, hdf_subject, reference, nb_points,
 ):
-
     ps = load_streamlines(join(path, f), reference, nb_points)
     ps.to_vox()
 
@@ -249,7 +249,6 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
         streamlines_group = hdf_subject.create_group('streamlines')
         streamlines = set_number_of_points(sft.streamlines, nb_points)
         streamlines = np.asarray(streamlines)
-        print(streamlines.shape)
         scores = sft.data_per_streamline['score'][..., 0]
 
         # The hdf5 can only store numpy arrays (it is actually the
@@ -294,17 +293,6 @@ def append_streamlines_to_hdf5(hdf_subject, sft, nb_points):
     data_group.resize(
         prev_data_shape[0] + streamlines.shape[0], axis=0)
     data_group[prev_data_shape[0]:] = streamlines
-
-    # prev_offsets_shape = offsets_group.shape
-    # new_offsets = streamlines._offsets + offsets_group[-1] + lengths_group[-1]
-    # offsets_group.resize(
-    #     prev_offsets_shape[0] + streamlines._offsets.shape[0], axis=0)
-    # offsets_group[prev_offsets_shape[0]:] = new_offsets
-
-    # prev_lengths_shape = lengths_group.shape
-    # lengths_group.resize(
-    #     prev_lengths_shape[0] + streamlines._lengths.shape[0], axis=0)
-    # lengths_group[prev_lengths_shape[0]:] = streamlines._lengths
 
     prev_scores_shape = scores_group.shape
     scores_group.resize(
