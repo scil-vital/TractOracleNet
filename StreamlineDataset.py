@@ -1,12 +1,10 @@
 import h5py
 import numpy as np
 
-from collections import defaultdict
-
 from nibabel.streamlines import Tractogram
 from torch.utils.data import Dataset
 
-import SubjectData
+from subject_data import SubjectData
 
 
 class StreamlineDataset(Dataset):
@@ -15,42 +13,45 @@ class StreamlineDataset(Dataset):
     """
 
     def __init__(
-        self, file_path: str, dataset_split: str, noise=0.0, device=None
+        self,
+        file_path: str,
+        noise: float = 0.1,
+        flip_p: float = 0.5,
+        device=None
     ):
         """
         Args:
         """
         self.file_path = file_path
-        self.split = dataset_split
         self.noise = noise
+        self.flip_p = flip_p
         with h5py.File(self.file_path, 'r') as f:
-            self.subject_list = list(f[dataset_split].keys())
-            self.indexes, self.rev_indexes, self.lengths = \
-                self._build_indexes(f, dataset_split)
-            self.state_size = self._compute_state_size(f)
+            self.subject_list = list(f.keys())
+            self.indexes = \
+                self._build_indexes(f)
+            self.input_size = self._compute_input_size()
 
-    def _build_indexes(self, dataset_file, split):
+    def _build_indexes(self, dataset_file):
         """
         """
         print('Building indexes')
         set_list = list()
-        lengths = []
-        rev_index = defaultdict(list)
 
-        split_set = dataset_file[split]
+        split_set = dataset_file
         for subject in list(split_set.keys()):
-            if subject != 'transitions':
-                streamlines = SubjectData.from_hdf_subject(
-                    split_set, subject).sft.streamlines
-                for i in range(len(streamlines)):
-                    k = (subject, i)
-                    rev_index[subject].append((len(set_list), i))
 
-                    set_list.append(k)
-                lengths.extend(streamlines._lengths)
+            streamlines = SubjectData.from_numpy_array(
+                split_set, subject).streamlines
+            for i in range(len(streamlines)):
+                k = (subject, i)
 
-        print('Done')
-        return set_list, rev_index, lengths
+                set_list.append(k)
+
+        return set_list
+
+    def _compute_input_size(self):
+        L, P = self.get_one_input().shape
+        return L * P
 
     @property
     def archives(self):
@@ -63,7 +64,7 @@ class StreamlineDataset(Dataset):
         state_0, *_ = self[0]
         self.f.close()
         del self.f
-        return state_0[0]
+        return state_0
 
     def __getitem__(self, index):
         """This method loads, transforms and returns slice corresponding to the
@@ -77,17 +78,22 @@ class StreamlineDataset(Dataset):
 
         # Map streamline total index -> subject.streamline_id
         subject, strml_idx = self.indexes[index]
-        f = self.archives[self.split]
-        subject_data = SubjectData.from_hdf_subject(f, subject)
-        sft = subject_data.sft.as_sft(strml_idx)
-        score = sft.data_per_streamline['scores'][0]
-        sft.to_vox()
-        streamline = sft.streamlines[0]
+        f = self.archives
+        # subject_data = SubjectData.from_hdf_subject(f, subject)
+
+        subject_data = SubjectData.from_numpy_array(
+            f, subject)
+
+        streamline = subject_data.streamlines[strml_idx]
+        score = subject_data.scores[strml_idx]
 
         if self.noise > 0.0:
+            dtype = streamline.dtype
             streamline = streamline + np.random.normal(
-                loc=0.0, scale=self.noise, size=streamline.shape)
-
+                loc=0.0, scale=self.noise, size=streamline.shape).astype(dtype)
+            # print(streamline.shape)
+        if np.random.random() < self.flip_p:
+            streamline = np.flip(streamline, axis=0).copy()
         return streamline, score
 
     def __len__(self):

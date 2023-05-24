@@ -10,7 +10,6 @@ from argparse import RawTextHelpFormatter
 from os.path import join
 
 from dipy.io.streamline import load_tractogram
-from dipy.io.stateful_tractogram import StatefulTractogram
 from dipy.tracking.streamline import set_number_of_points
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,8 +54,7 @@ def main():
     generate_dataset(path=args.path,
                      config_file=args.config_file,
                      output=args.output,
-                     nb_points=args.nb_points,
-                     normalize=args.normalize)
+                     nb_points=args.nb_points)
 
 
 def generate_dataset(
@@ -89,37 +87,30 @@ def generate_dataset(
             config = json.load(conf)
 
             add_subjects_to_hdf5(
-                path, config, hdf_file, "training", nb_points)
-
-            add_subjects_to_hdf5(
-                path, config, hdf_file, "validation", nb_points)
-
-            add_subjects_to_hdf5(
-                path, config, hdf_file, "testing", nb_points)
+                path, config, hdf_file, nb_points)
 
     print("Saved dataset : {}".format(dataset_file))
 
 
 def add_subjects_to_hdf5(
 
-    path, config, hdf_file, dataset_split, nb_points
+    path, config, hdf_file, nb_points
 ):
     """
 
     Args:
+        path:
         config:
         hdf_file:
-        dataset_split:
         nb_points:
 
     """
 
-    hdf_split = hdf_file.create_group(dataset_split)
-    for subject_id in config[dataset_split]:
+    for subject_id in config:
         "Processing subject {}".format(subject_id),
 
-        subject_config = config[dataset_split][subject_id]
-        hdf_subject = hdf_split.create_group(subject_id)
+        subject_config = config[subject_id]
+        hdf_subject = hdf_file.create_group(subject_id)
         add_subject_to_hdf5(path, subject_config, hdf_subject, nb_points)
 
 
@@ -129,6 +120,7 @@ def add_subject_to_hdf5(
     """
 
     Args:
+        path
         config:
         hdf_subject:
         nb_points:
@@ -136,18 +128,18 @@ def add_subject_to_hdf5(
     """
 
     reference_anat = config['reference']
-    bundle_files = config['bundles']
+    streamlines_files_list = config['streamlines']
 
     # Process subject's data
     process_subject(
-        hdf_subject, path, reference_anat, bundle_files, nb_points)
+        hdf_subject, path, reference_anat, streamlines_files_list, nb_points)
 
 
 def process_subject(
     hdf_subject,
     path: str,
     reference: str,
-    bundles: str,
+    streamlines_files: str,
     nb_points: float,
 ):
     """
@@ -164,11 +156,11 @@ def process_subject(
     ref_volume = nib.load(join(path, reference))
 
     process_all_streamlines(
-        hdf_subject, path, bundles, ref_volume, nb_points)
+        hdf_subject, path, streamlines_files, ref_volume, nb_points)
 
 
 def process_all_streamlines(
-    hdf_subject, path, bundles, reference, nb_points,
+    hdf_subject, path, streamlines_files, reference, nb_points,
 ):
     """ Process bundles.
 
@@ -183,18 +175,18 @@ def process_all_streamlines(
     """
     print('Processing streamlines')
 
-    for bundle in bundles:
+    for bundle in streamlines_files:
         process_bundle(path, bundle, hdf_subject, reference, nb_points)
 
 
 def process_bundle(
-    path, f, hdf_subject, reference, score, nb_points,
+    path, f, hdf_subject, reference, nb_points,
 ):
 
     ps = load_streamlines(join(path, f), reference, nb_points)
     ps.to_vox()
 
-    add_streamlines_to_hdf5(hdf_subject, ps)
+    add_streamlines_to_hdf5(hdf_subject, ps, nb_points)
 
 
 def load_streamlines(
@@ -216,10 +208,10 @@ def load_streamlines(
 
     sft = load_tractogram(streamlines_file, reference, bbox_valid_check=False)
     sft.to_center()
-    lengths = np.asarray([len(s) for s in sft.streamlines])
+    sft.to_vox()
 
-    sft = StatefulTractogram.from_sft(
-        set_number_of_points(sft.streamlines[lengths > 0], nb_points), sft)
+    lengths = np.asarray([len(s) for s in sft.streamlines])
+    sft = sft[lengths > 0]
 
     return sft
 
@@ -239,7 +231,7 @@ def add_volume_to_hdf5(hdf_subject, volume_img, volume_name):
     hdf_input_volume.create_dataset('data', data=volume_img.get_fdata())
 
 
-def add_streamlines_to_hdf5(hdf_subject, sft, scores):
+def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
     """
     Add streamlines to HDF5
 
@@ -255,59 +247,64 @@ def add_streamlines_to_hdf5(hdf_subject, sft, scores):
     if 'streamlines' not in hdf_subject:
 
         streamlines_group = hdf_subject.create_group('streamlines')
-        streamlines = sft.streamlines
-        scores = sft.data_per_streamline['scores']
+        streamlines = set_number_of_points(sft.streamlines, nb_points)
+        streamlines = np.asarray(streamlines)
+        print(streamlines.shape)
+        scores = sft.data_per_streamline['score'][..., 0]
 
         # The hdf5 can only store numpy arrays (it is actually the
         # reason why it can fetch only precise streamlines from
         # their ID). We need to deconstruct the sft and store all
         # its data separately to allow reconstructing it later.
-        (a, d, vs, vo) = sft.space_attributes
-        streamlines_group.attrs['space'] = str(sft.space)
-        streamlines_group.attrs['affine'] = a
-        streamlines_group.attrs['dimensions'] = d
-        streamlines_group.attrs['voxel_sizes'] = vs
-        streamlines_group.attrs['voxel_order'] = vo
+        # (a, d, vs, vo) = sft.space_attributes
+        # streamlines_group.attrs['space'] = str(sft.space)
+        # streamlines_group.attrs['affine'] = a
+        # streamlines_group.attrs['origin'] = str(sft.origin)
+        # streamlines_group.attrs['dimensions'] = d
+        # streamlines_group.attrs['voxel_sizes'] = vs
+        # streamlines_group.attrs['voxel_order'] = vo
 
         # Accessing private Dipy values, but necessary.
         # We need to deconstruct the streamlines into arrays with
         # types recognizable by the hdf5.
         streamlines_group.create_dataset(
-            'data', maxshape=(None, streamlines._data.shape[-1]),
-            data=streamlines._data)
-        streamlines_group.create_dataset('offsets', maxshape=(None,),
-                                         data=streamlines._offsets)
-        streamlines_group.create_dataset('lengths', maxshape=(None,),
-                                         data=streamlines._lengths)
+            'data', maxshape=(None, nb_points, streamlines.shape[-1]),
+            data=streamlines)
+        # streamlines_group.create_dataset('offsets', maxshape=(None,),
+        #                                  data=streamlines._offsets)
+        # streamlines_group.create_dataset('lengths', maxshape=(None,),
+        #                                  data=streamlines._lengths)
         streamlines_group.create_dataset('scores', maxshape=(None,),
                                          data=scores)
     else:
-        append_streamlines_to_hdf5(hdf_subject, sft, scores)
+        append_streamlines_to_hdf5(hdf_subject, sft, nb_points)
 
 
-def append_streamlines_to_hdf5(hdf_subject, sft, scores):
+def append_streamlines_to_hdf5(hdf_subject, sft, nb_points):
     streamlines_group = hdf_subject['streamlines']
     data_group = streamlines_group['data']
-    offsets_group = streamlines_group['offsets']
-    lengths_group = streamlines_group['lengths']
+    # offsets_group = streamlines_group['offsets']
+    # lengths_group = streamlines_group['lengths']
     scores_group = streamlines_group['scores']
 
-    streamlines = sft.streamlines
+    streamlines = set_number_of_points(sft.streamlines, nb_points)
+    streamlines = np.asarray(streamlines)
+    scores = sft.data_per_streamline['score'][..., 0]
     prev_data_shape = data_group.shape
     data_group.resize(
-        prev_data_shape[0] + streamlines._data.shape[0], axis=0)
-    data_group[prev_data_shape[0]:] = streamlines._data
+        prev_data_shape[0] + streamlines.shape[0], axis=0)
+    data_group[prev_data_shape[0]:] = streamlines
 
-    prev_offsets_shape = offsets_group.shape
-    new_offsets = streamlines._offsets + offsets_group[-1] + lengths_group[-1]
-    offsets_group.resize(
-        prev_offsets_shape[0] + streamlines._offsets.shape[0], axis=0)
-    offsets_group[prev_offsets_shape[0]:] = new_offsets
+    # prev_offsets_shape = offsets_group.shape
+    # new_offsets = streamlines._offsets + offsets_group[-1] + lengths_group[-1]
+    # offsets_group.resize(
+    #     prev_offsets_shape[0] + streamlines._offsets.shape[0], axis=0)
+    # offsets_group[prev_offsets_shape[0]:] = new_offsets
 
-    prev_lengths_shape = lengths_group.shape
-    lengths_group.resize(
-        prev_lengths_shape[0] + streamlines._lengths.shape[0], axis=0)
-    lengths_group[prev_lengths_shape[0]:] = streamlines._lengths
+    # prev_lengths_shape = lengths_group.shape
+    # lengths_group.resize(
+    #     prev_lengths_shape[0] + streamlines._lengths.shape[0], axis=0)
+    # lengths_group[prev_lengths_shape[0]:] = streamlines._lengths
 
     prev_scores_shape = scores_group.shape
     scores_group.resize(
