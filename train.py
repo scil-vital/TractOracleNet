@@ -35,8 +35,8 @@ class TractOracleTraining():
         self.layers = train_dto['layers']
         self.render = train_dto['render']
 
-        self.num_workers = 12
-        self.batch_size = 2 ** 12
+        self.num_workers = 8
+        self.batch_size = 2 ** 8
 
         #  Tracking parameters
         self.train_dataset_file = train_dto['train_dataset_file']

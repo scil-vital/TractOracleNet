@@ -25,6 +25,7 @@ class StreamlineDataset(Dataset):
         self.file_path = file_path
         self.noise = noise
         self.flip_p = flip_p
+        self.n_f = 0
         with h5py.File(self.file_path, 'r') as f:
             self.subject_list = list(f.keys())
             self.indexes = \
@@ -61,6 +62,10 @@ class StreamlineDataset(Dataset):
             self.f = h5py.File(self.file_path, 'r')
         return self.f
 
+    def __del__(self):
+        self.f.close()
+        print('Destructor called, File closed.')
+
     def _get_one_input(self):
         """ TODO
         """
@@ -83,13 +88,13 @@ class StreamlineDataset(Dataset):
 
         # Map streamline total index -> subject.streamline_id
         subject, strml_idx = self.indexes[index]
+
         f = self.archives
 
-        subject_data = SubjectData.from_numpy_array(
-            f, subject)
+        hdf_subject = f[subject]['streamlines']
 
-        streamline = subject_data.streamlines[strml_idx]
-        score = subject_data.scores[strml_idx]
+        streamline = hdf_subject['data'][strml_idx]
+        score = hdf_subject['scores'][strml_idx]
 
         # Add noise to streamline points for robustness
         if self.noise > 0.0:

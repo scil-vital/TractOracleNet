@@ -174,25 +174,42 @@ def process_all_streamlines(
         sfts, scores
 
     """
-    print('Processing streamlines')
-
+    total = 0
+    idx = 0
+    print('Computing size of dataset.')
     for bundle in tqdm(streamlines_files):
-        process_bundle(path, bundle, hdf_subject, reference, nb_points)
+        total += get_number_of_streamlines(path, bundle, reference)
+    print('Dataset will have {} streamlines'.format(total))
+    print('Writing streamlines to dataset.')
+    for bundle in tqdm(streamlines_files):
+        idx += process_bundle(
+            path, bundle, hdf_subject, reference, nb_points, total, idx)
+
+
+def get_number_of_streamlines(
+    path, f, reference
+):
+    ps = load_streamlines(join(path, f), reference)
+
+    return len(ps)
 
 
 def process_bundle(
-    path, f, hdf_subject, reference, nb_points,
+    path, f, hdf_subject, reference, nb_points, total, idx
 ):
-    ps = load_streamlines(join(path, f), reference, nb_points)
-    ps.to_vox()
+    ps = load_streamlines(join(path, f), reference)
 
-    add_streamlines_to_hdf5(hdf_subject, ps, nb_points)
+    len_ps = len(ps)
+
+    add_streamlines_to_hdf5(hdf_subject, ps, nb_points, total, idx)
+
+    return len_ps
 
 
 def load_streamlines(
     streamlines_file: str,
     reference,
-    nb_points: int,
+    nb_points: int = None,
 ):
     """
 
@@ -210,28 +227,10 @@ def load_streamlines(
     sft.to_center()
     sft.to_vox()
 
-    lengths = np.asarray([len(s) for s in sft.streamlines])
-    sft = sft[lengths > 0]
-
     return sft
 
 
-def add_volume_to_hdf5(hdf_subject, volume_img, volume_name):
-    """
-
-    Args:
-        hdf_subject:
-        volume_img:
-        volume_name:
-
-    """
-
-    hdf_input_volume = hdf_subject.create_group(volume_name)
-    hdf_input_volume.attrs['vox2rasmm'] = volume_img.affine
-    hdf_input_volume.create_dataset('data', data=volume_img.get_fdata())
-
-
-def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
+def add_streamlines_to_hdf5(hdf_subject, sft, nb_points, total, idx):
     """
     Add streamlines to HDF5
 
@@ -249,7 +248,6 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
         streamlines_group = hdf_subject.create_group('streamlines')
         streamlines = set_number_of_points(sft.streamlines, nb_points)
         streamlines = np.asarray(streamlines)
-        scores = sft.data_per_streamline['score'][..., 0]
 
         # The hdf5 can only store numpy arrays (it is actually the
         # reason why it can fetch only precise streamlines from
@@ -267,19 +265,18 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
         # We need to deconstruct the streamlines into arrays with
         # types recognizable by the hdf5.
         streamlines_group.create_dataset(
-            'data', maxshape=(None, nb_points, streamlines.shape[-1]),
-            data=streamlines, chunks=(1, nb_points, streamlines.shape[-1]))
+            'data', shape=(total, nb_points, streamlines.shape[-1]))
         # streamlines_group.create_dataset('offsets', maxshape=(None,),
         #                                  data=streamlines._offsets)
         # streamlines_group.create_dataset('lengths', maxshape=(None,),
         #                                  data=streamlines._lengths)
         streamlines_group.create_dataset(
-            'scores', maxshape=(None,), data=scores, chunks=True)
-    else:
-        append_streamlines_to_hdf5(hdf_subject, sft, nb_points)
+            'scores', shape=(total))
+
+    append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx)
 
 
-def append_streamlines_to_hdf5(hdf_subject, sft, nb_points):
+def append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx):
     streamlines_group = hdf_subject['streamlines']
     data_group = streamlines_group['data']
     # offsets_group = streamlines_group['offsets']
@@ -288,16 +285,11 @@ def append_streamlines_to_hdf5(hdf_subject, sft, nb_points):
 
     streamlines = set_number_of_points(sft.streamlines, nb_points)
     streamlines = np.asarray(streamlines)
-    scores = sft.data_per_streamline['score'][..., 0]
-    prev_data_shape = data_group.shape
-    data_group.resize(
-        prev_data_shape[0] + streamlines.shape[0], axis=0)
-    data_group[prev_data_shape[0]:] = streamlines
+    scores = np.asarray(sft.data_per_streamline['score']).squeeze()
 
-    prev_scores_shape = scores_group.shape
-    scores_group.resize(
-        prev_scores_shape[0] + scores.shape[0], axis=0)
-    scores_group[prev_scores_shape[0]:] = scores
+    assert streamlines.shape[0] == scores.shape[0]
+    data_group[idx:idx + streamlines.shape[0], ...] = streamlines
+    scores_group[idx:idx + streamlines.shape[0]] = scores
 
 
 if __name__ == "__main__":
