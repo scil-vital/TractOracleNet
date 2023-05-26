@@ -27,7 +27,7 @@ class SubjectData(object):
         hdf_subject = hdf_file[subject_id]
 
         streamlines = hdf_subject['streamlines']['data']
-        scores = np.array(hdf_subject['streamlines']['scores'])
+        scores = hdf_subject['streamlines']['scores']
 
         return cls(subject_id, streamlines=streamlines, scores=scores)
 

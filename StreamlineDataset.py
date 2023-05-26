@@ -9,7 +9,7 @@ from subject_data import SubjectData
 
 class StreamlineDataset(Dataset):
     """
-    class that loads hdf5 dataset object
+    TODO
     """
 
     def __init__(
@@ -32,7 +32,7 @@ class StreamlineDataset(Dataset):
             self.input_size = self._compute_input_size()
 
     def _build_indexes(self, dataset_file):
-        """
+        """ TODO
         """
         print('Building indexes')
         set_list = list()
@@ -50,16 +50,20 @@ class StreamlineDataset(Dataset):
         return set_list
 
     def _compute_input_size(self):
-        L, P = self.get_one_input().shape
+        L, P = self._get_one_input().shape
         return L * P
 
     @property
     def archives(self):
+        """ TODO
+        """
         if not hasattr(self, 'f'):
             self.f = h5py.File(self.file_path, 'r')
         return self.f
 
-    def get_one_input(self):
+    def _get_one_input(self):
+        """ TODO
+        """
 
         state_0, *_ = self[0]
         self.f.close()
@@ -67,19 +71,19 @@ class StreamlineDataset(Dataset):
         return state_0
 
     def __getitem__(self, index):
-        """This method loads, transforms and returns slice corresponding to the
-        corresponding index.
+        """This method loads the hdf5, gets the subject and streamline id
+        corresonding to the data index and returns the associated data and
+        target.
+
         :arg
             index: the index of the slice within patient data
         :return
             A tuple (input, target)
         """
-        # return index
 
         # Map streamline total index -> subject.streamline_id
         subject, strml_idx = self.indexes[index]
         f = self.archives
-        # subject_data = SubjectData.from_hdf_subject(f, subject)
 
         subject_data = SubjectData.from_numpy_array(
             f, subject)
@@ -87,18 +91,26 @@ class StreamlineDataset(Dataset):
         streamline = subject_data.streamlines[strml_idx]
         score = subject_data.scores[strml_idx]
 
+        # Add noise to streamline points for robustness
         if self.noise > 0.0:
             dtype = streamline.dtype
             streamline = streamline + np.random.normal(
                 loc=0.0, scale=self.noise, size=streamline.shape).astype(dtype)
-            # print(streamline.shape)
+
+        # Flip streamline for robustness
         if np.random.random() < self.flip_p:
             streamline = np.flip(streamline, axis=0).copy()
-        return streamline, score
+
+        # Convert the streamline points to directions
+        # Works really well
+        dirs = np.diff(streamline, axis=0)
+
+        return dirs, score
 
     def __len__(self):
         """
-        return the length of the dataset
+        Return the length of the dataset, i.e. the number
+        of streamlines in the dataset.
         """
         return int(len(self.indexes))
 

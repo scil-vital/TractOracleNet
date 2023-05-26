@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
+from lightning.pytorch import LightningModule
 
 
 def format_widths(widths_str):
@@ -24,13 +24,14 @@ def make_fc_network(
     return nn.Sequential(*layers)
 
 
-class FeedForwardOracle(pl.LightningModule):
+class FeedForwardOracle(LightningModule):
 
-    def __init__(self, input_size, output_size, layers):
+    def __init__(self, input_size, output_size, layers, lr):
         super(FeedForwardOracle, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
         self.layers = format_widths(layers)
+        self.lr = lr
 
         self.network = make_fc_network(
             self.layers, self.input_size, self.output_size)
@@ -39,18 +40,18 @@ class FeedForwardOracle(pl.LightningModule):
         return self.network(x).squeeze()
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
         x, y = val_batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log('val_loss', loss)
+        self.log('val_loss', loss, on_step=False, on_epoch=True)

@@ -268,13 +268,13 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
         # types recognizable by the hdf5.
         streamlines_group.create_dataset(
             'data', maxshape=(None, nb_points, streamlines.shape[-1]),
-            data=streamlines)
+            data=streamlines, chunks=(1, nb_points, streamlines.shape[-1]))
         # streamlines_group.create_dataset('offsets', maxshape=(None,),
         #                                  data=streamlines._offsets)
         # streamlines_group.create_dataset('lengths', maxshape=(None,),
         #                                  data=streamlines._lengths)
-        streamlines_group.create_dataset('scores', maxshape=(None,),
-                                         data=scores)
+        streamlines_group.create_dataset(
+            'scores', maxshape=(None,), data=scores, chunks=True)
     else:
         append_streamlines_to_hdf5(hdf_subject, sft, nb_points)
 

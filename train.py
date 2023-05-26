@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 import argparse
-import pytorch_lightning as pl
 import torch
 
-
 from argparse import RawTextHelpFormatter
+from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.tuner import Tuner
-from torch.utils.data import DataLoader, random_split
+from os.path import join
+# from lightning.pytorch.tuner import Tuner
 
+from data_module import StreamlineDataModule
 from feedforwardmodel import FeedForwardOracle
-from StreamlineDataset import StreamlineDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,7 +27,7 @@ class TractOracleTraining():
         """
         self.experiment_path = train_dto['path']
         self.experiment = train_dto['experiment']
-        self.name = train_dto['name']
+        self.id = train_dto['id']
 
         # RL parameters
         self.lr = train_dto['lr']
@@ -36,8 +35,8 @@ class TractOracleTraining():
         self.layers = train_dto['layers']
         self.render = train_dto['render']
 
-        self.num_workers = 8
-        self.batch_size = 8192
+        self.num_workers = 12
+        self.batch_size = 2 ** 12
 
         #  Tracking parameters
         self.train_dataset_file = train_dto['train_dataset_file']
@@ -45,56 +44,34 @@ class TractOracleTraining():
 
     def train(
         self,
-        model,
-        train_dataset: StreamlineDataset,
-        test_dataset: StreamlineDataset,
     ):
         """
         """
-        len_train = len(train_dataset)
 
-        train_split, valid_split = int(len_train*0.8), int(len_train*0.2)+1
+        # Get example state to define NN input size
+        # 128 points directions -> 127 3D directions
+        self.input_size = (128-1) * 3  # Get this from datamodule ?
+        self.output_size = 1
 
-        train_data, val_data = random_split(train_dataset,
-                                            [train_split, valid_split])
+        model = FeedForwardOracle(
+            self.input_size, self.output_size, self.layers, self.lr)
 
-        train_loader = DataLoader(train_data,
-                                  num_workers=self.num_workers)
-        # batch_size=self.batch_size,
-        # prefetch_factor=1,
-        # persistent_workers=True
-        # if self.num_workers > 0 else False,
-        # pin_memory=True)
+        dm = StreamlineDataModule(
+            self.train_dataset_file, self.test_dataset_file,
+            self.batch_size, self.num_workers)
 
-        valid_loader = DataLoader(val_data,
-                                  num_workers=self.num_workers)
-        # batch_size=self.batch_size,
-        # prefetch_factor=1,
-        # persistent_workers=True
-        # if self.num_workers > 0 else False,
-        # pin_memory=True)
+        root_dir = join(self.experiment_path, self.experiment, self.id)
 
-        # using LightningDataModule
+        # Training
+        logger = TensorBoardLogger(root_dir, name=self.id)
+        trainer = Trainer(logger=logger,
+                          num_sanity_val_steps=0,
+                          max_epochs=self.max_ep,
+                          enable_checkpointing=True,
+                          default_root_dir=root_dir,
+                          profiler='simple')
 
-        class LitDataModule(pl.LightningDataModule):
-            def __init__(self, batch_size):
-                super().__init__()
-                self.batch_size = batch_size
-
-                def train_dataloader(self):
-                    return DataLoader(
-                        train_data, batch_size=self.batch_size)
-
-        # training
-        logger = TensorBoardLogger("tb_logs", name="my_model")
-        trainer = pl.Trainer(log_every_n_steps=1, logger=logger,
-                             num_sanity_val_steps=0)
-        tuner = Tuner(trainer)
-
-        # Auto-scale batch size by growing it exponentially (default)
-        tuner.scale_batch_size(model, mode="power")
-
-        trainer.fit(model, train_loader, valid_loader)
+        trainer.fit(model, dm)
 
     def run(self):
         """
@@ -105,20 +82,8 @@ class TractOracleTraining():
         # states will be returned. The environment updates the streamline
         # internally
 
-        train_dataset = StreamlineDataset(
-            self.train_dataset_file)
-        test_dataset = StreamlineDataset(
-            self.test_dataset_file)
-
-        # Get example state to define NN input size
-        self.input_size = train_dataset.input_size
-        self.output_size = 1
-
-        model = FeedForwardOracle(
-            self.input_size, self.output_size, self.layers)
-
         # Start training !
-        self.train(model, train_dataset, test_dataset)
+        self.train()
 
 
 def add_args(parser):
@@ -126,7 +91,7 @@ def add_args(parser):
                         help='Path to experiment')
     parser.add_argument('experiment',
                         help='Name of experiment.')
-    parser.add_argument('name', type=str,
+    parser.add_argument('id', type=str,
                         help='ID of experiment.')
     parser.add_argument('lr', type=float,
                         help='Learning rate.')
