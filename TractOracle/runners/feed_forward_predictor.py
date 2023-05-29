@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from argparse import RawTextHelpFormatter
-from dipy.io.streamline import load_tractogram
+from dipy.io.streamline import load_tractogram, save_tractogram
 from dipy.tracking.streamline import set_number_of_points
 
 from TractOracle.models.feed_forward import FeedForwardOracle
@@ -29,6 +29,8 @@ class TractOracleTraining():
         self.checkpoint = train_dto['checkpoint']
         self.tractogram = train_dto['tractogram']
         self.reference = train_dto['reference']
+        self.threshold = train_dto['threshold']
+        self.out = train_dto['out']
 
     def train(
         self,
@@ -55,15 +57,19 @@ class TractOracleTraining():
         sft = load_tractogram(self.tractogram, self.reference)
         sft.to_vox()
 
-        streamlines = set_number_of_points(sft.streamlines, 128)
-        dirs = np.diff(streamlines, axis=1)
+        resampled_streamlines = set_number_of_points(sft.streamlines, 128)
+        dirs = np.diff(resampled_streamlines, axis=1)
 
         data = torch.as_tensor(dirs, dtype=torch.float, device='cuda')
 
         with torch.no_grad():
             predictions = model(data).cpu().numpy()
 
-        print(predictions)
+        ids = np.argwhere(predictions > self.threshold).squeeze()
+
+        filtered = sft[ids]
+
+        save_tractogram(filtered, self.out, bbox_valid_check=False)
 
     def run(self):
         """
@@ -86,11 +92,17 @@ def add_args(parser):
     parser.add_argument('id', type=str,
                         help='ID of experiment.')
     parser.add_argument('checkpoint', type=str,
-                        help='TODO')
+                        help='Checkpoint (.ckpt) containing hyperparameters '
+                             'and weights of model.')
     parser.add_argument('tractogram', type=str,
-                        help='TODO')
-    parser.add_argument('reference', type=str,
-                        help='TODO change this for scilpy')
+                        help='Tractogram file to score.')
+    parser.add_argument('reference', type=str, default='same',
+                        help='Reference file for tractogram (.nii.gz).'
+                             'For .trk, can be \'same\'.')
+    parser.add_argument('out', type=str,
+                        help='Output file.')
+    parser.add_argument('--threshold', type=float, default=0.5,
+                        help='Threshold score for filtering.')
 
 
 def parse_args():
