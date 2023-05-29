@@ -29,6 +29,8 @@ class FeedForwardOracle(LightningModule):
     def __init__(self, input_size, output_size, layers, lr):
         super(FeedForwardOracle, self).__init__()
 
+        self.hparams["name"] = self.__class__.__name__
+
         self.input_size = input_size
         self.output_size = output_size
         self.layers = format_widths(layers)
