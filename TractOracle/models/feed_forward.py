@@ -28,6 +28,7 @@ class FeedForwardOracle(LightningModule):
 
     def __init__(self, input_size, output_size, layers, lr):
         super(FeedForwardOracle, self).__init__()
+
         self.input_size = input_size
         self.output_size = output_size
         self.layers = format_widths(layers)
@@ -35,6 +36,8 @@ class FeedForwardOracle(LightningModule):
 
         self.network = make_fc_network(
             self.layers, self.input_size, self.output_size)
+
+        self.save_hyperparameters()
 
     def forward(self, x):
         return self.network(x).squeeze()

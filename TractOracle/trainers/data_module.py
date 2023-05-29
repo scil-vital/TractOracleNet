@@ -1,7 +1,7 @@
 import lightning.pytorch as pl
 from torch.utils.data import random_split, DataLoader
 
-from StreamlineDataset import StreamlineDataset
+from TractOracle.datasets.StreamlineDataset import StreamlineDataset
 
 
 class StreamlineDataModule(pl.LightningDataModule):
@@ -27,6 +27,7 @@ class StreamlineDataModule(pl.LightningDataModule):
             'num_workers': self.num_workers,
             'persistent_workers': False,
             'pin_memory': False,
+            'shuffle': True,
         }
 
     def prepare_data(self):

@@ -8,8 +8,8 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from os.path import join
 # from lightning.pytorch.tuner import Tuner
 
-from data_module import StreamlineDataModule
-from feedforwardmodel import FeedForwardOracle
+from TractOracle.models.feed_forward import FeedForwardOracle
+from TractOracle.trainers.data_module import StreamlineDataModule
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -33,10 +33,11 @@ class TractOracleTraining():
         self.lr = train_dto['lr']
         self.max_ep = train_dto['max_ep']
         self.layers = train_dto['layers']
+        self.checkpoint = train_dto['checkpoint']
         self.render = train_dto['render']
 
-        self.num_workers = 8
-        self.batch_size = 2 ** 8
+        self.num_workers = train_dto['num_workers']
+        self.batch_size = train_dto['batch_size']
 
         #  Tracking parameters
         self.train_dataset_file = train_dto['train_dataset_file']
@@ -53,8 +54,11 @@ class TractOracleTraining():
         self.input_size = (128-1) * 3  # Get this from datamodule ?
         self.output_size = 1
 
-        model = FeedForwardOracle(
-            self.input_size, self.output_size, self.layers, self.lr)
+        if self.checkpoint:
+            model = FeedForwardOracle.load_from_checkpoint(self.checkpoint)
+        else:
+            model = FeedForwardOracle(
+                self.input_size, self.output_size, self.layers, self.lr)
 
         dm = StreamlineDataModule(
             self.train_dataset_file, self.test_dataset_file,
@@ -71,7 +75,7 @@ class TractOracleTraining():
                           default_root_dir=root_dir,
                           profiler='simple')
 
-        trainer.fit(model, dm)
+        trainer.fit(model, dm, ckpt_path=self.checkpoint)
 
     def run(self):
         """
@@ -103,6 +107,12 @@ def add_args(parser):
                         help='Training dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
+    parser.add_argument('--batch_size', type=int, default=2**12,
+                        help='TODO')
+    parser.add_argument('--num_workers', type=int, default=12,
+                        help='TODO')
+    parser.add_argument('--checkpoint', type=str,
+                        help='TODO')
     parser.add_argument('--use_gpu', action='store_true',
                         help='Use gpu or not')
     parser.add_argument('--rng_seed', default=1337, type=int,

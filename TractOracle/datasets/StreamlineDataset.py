@@ -4,8 +4,6 @@ import numpy as np
 from nibabel.streamlines import Tractogram
 from torch.utils.data import Dataset
 
-from subject_data import SubjectData
-
 
 class StreamlineDataset(Dataset):
     """
@@ -39,10 +37,11 @@ class StreamlineDataset(Dataset):
         set_list = list()
 
         split_set = dataset_file
-        for subject in list(split_set.keys()):
 
-            streamlines = SubjectData.from_numpy_array(
-                split_set, subject).streamlines
+        f = self.archives
+
+        for subject in list(split_set.keys()):
+            streamlines = f[subject]['streamlines']['data']
             for i in range(len(streamlines)):
                 k = (subject, i)
 
@@ -63,8 +62,9 @@ class StreamlineDataset(Dataset):
         return self.f
 
     def __del__(self):
-        self.f.close()
-        print('Destructor called, File closed.')
+        if hasattr(self, 'f'):
+            self.f.close()
+            print('Destructor called, File closed.')
 
     def _get_one_input(self):
         """ TODO
