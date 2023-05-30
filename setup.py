@@ -89,7 +89,9 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            "feed_forward_train.py=TractOracle.trainers.feed_forward_train:main"]  # noqa: E501
+            "feed_forward_train.py=TractOracle.trainers.feed_forward_train:main",  # noqa: E501
+            "autoencoder_train.py=TractOracle.trainers.autoencoder_train:main",  # noqa: E501
+            "predictor.py=TractOracle.runners.predictor:main"]
     },
     include_package_data=True,
 )

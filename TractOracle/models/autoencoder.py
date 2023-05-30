@@ -33,20 +33,41 @@ class AutoencoderOracle(LightningModule):
 
         self.input_size = input_size
         self.output_size = output_size
+        self.kernel_size = 3
         self.layers = format_widths(layers)
         self.lr = lr
 
-        self.network = make_fc_network(
-            self.layers, self.input_size, self.output_size)
+        # TODO: Make the autoencoder architecture parametrizable ?
 
         self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 64),
+            nn.Conv1d(3, 32, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Linear(64, 3))
+            nn.Conv1d(32, 64, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(64, 128, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(128, 256, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(256, 512, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(512, 1024, 3, stride=1, padding=0))
+
+        self.network = make_fc_network(
+            self.layers, 1024, self.output_size)
+
         self.decoder = nn.Sequential(
-            nn.Linear(3, 64),
+            nn.ConvTranspose1d(1024, 512, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Linear(64, 28 * 28))
+            nn.ConvTranspose1d(512, 256, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(256, 128, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(128, 64, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(64, 32, 3, stride=2, padding=0),
+            nn.ReLU(),
+            nn.ConvTranspose1d(32, 3, 3, stride=2, padding=0),
+        )
 
         self.save_hyperparameters()
 
@@ -55,22 +76,35 @@ class AutoencoderOracle(LightningModule):
         return optimizer
 
     def forward(self, x):
-        # TODO: Add latent-space predictor
-        return self.network(x).squeeze()
+        x = x.permute(0, 2, 1)
+        z = self.encoder(x).squeeze()
+        return self.network(z).squeeze()
 
     def training_step(self, train_batch, batch_idx):
-        # TODO: Add latent-space predictor
         x, y = train_batch
+        x = x.permute(0, 2, 1)
         z = self.encoder(x)
+
+        y_hat = self.network(z.squeeze()).squeeze()
+        pred_loss = F.mse_loss(y_hat, y)
+
         x_hat = self.decoder(z)
-        loss = F.mse_loss(x_hat, x)
-        self.log('train_loss', loss, on_step=False, on_epoch=True)
-        return loss
+        reconst_loss = F.mse_loss(x_hat, x)
+        self.log(
+            'reconst_train_loss', reconst_loss, on_step=False, on_epoch=True)
+        self.log('pred_train_loss', pred_loss, on_step=False, on_epoch=True)
+        return reconst_loss + pred_loss
 
     def validation_step(self, val_batch, batch_idx):
-        # TODO: Add latent-space predictor
         x, y = val_batch
+        x = x.permute(0, 2, 1)
         z = self.encoder(x)
+
+        y_hat = self.network(z.squeeze()).squeeze()
+        pred_loss = F.mse_loss(y_hat, y)
+
         x_hat = self.decoder(z)
-        loss = F.mse_loss(x_hat, x)
-        self.log('val_loss', loss, on_step=False, on_epoch=True)
+        reconst_loss = F.mse_loss(x_hat, x)
+        self.log(
+            'reconst_val_loss', reconst_loss, on_step=False, on_epoch=True)
+        self.log('pred_val_loss', pred_loss, on_step=False, on_epoch=True)
