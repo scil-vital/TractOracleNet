@@ -7,12 +7,13 @@ from argparse import RawTextHelpFormatter
 from dipy.io.streamline import load_tractogram, save_tractogram
 from dipy.tracking.streamline import set_number_of_points
 
+from TractOracle.models.autoencoder import AutoencoderOracle
 from TractOracle.models.feed_forward import FeedForwardOracle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class TractOracleTraining():
+class TractOraclePredictor():
     """
     Main RL tracking experiment
     """
@@ -32,56 +33,58 @@ class TractOracleTraining():
         self.threshold = train_dto['threshold']
         self.out = train_dto['out']
 
-    def train(
-        self,
-    ):
-        """
-        """
-
-        # Get example state to define NN input size
-        # 128 points directions -> 127 3D directions
-        self.input_size = (128-1) * 3  # Get this from datamodule ?
-        self.output_size = 1
-
-        checkpoint = torch.load(self.checkpoint)
-        hyper_parameters = checkpoint["hyper_parameters"]
-
-        models = {
-            'FeedForwardOracle': FeedForwardOracle
-        }
-
-        model = models[hyper_parameters[
-            'name']].load_from_checkpoint(self.checkpoint)
-        model.eval()
-
-        sft = load_tractogram(self.tractogram, self.reference)
-        sft.to_vox()
-
-        resampled_streamlines = set_number_of_points(sft.streamlines, 128)
-        dirs = np.diff(resampled_streamlines, axis=1)
-
-        data = torch.as_tensor(dirs, dtype=torch.float, device='cuda')
-
-        with torch.no_grad():
-            predictions = model(data).cpu().numpy()
-
-        ids = np.argwhere(predictions > self.threshold).squeeze()
-
-        filtered = sft[ids]
-
-        save_tractogram(filtered, self.out, bbox_valid_check=False)
-
     def run(self):
         """
         Main method where the magic happens
         """
 
-        # Instanciate environment. Actions will be fed to it and new
-        # states will be returned. The environment updates the streamline
-        # internally
+        # Get example state to define NN input size
+        # 128 points directions -> 127 3D directions
+        self.input_size = (128-1) * 3  # TODO: Get this from datamodule
+        self.output_size = 1  # TODO: Get this from datamodule.
+        # Might quantize score in the future ?
 
-        # Start training !
-        self.train()
+        # Load the model's hyper and actual params from a saved checkpoint
+        checkpoint = torch.load(self.checkpoint)
+        hyper_parameters = checkpoint["hyper_parameters"]
+
+        # The model's class is saved in hparams
+        models = {
+            'AutoencoderOracle': AutoencoderOracle,
+            'FeedForwardOracle': FeedForwardOracle
+        }
+
+        # Load it from the checkpoint
+        model = models[hyper_parameters[
+            'name']].load_from_checkpoint(self.checkpoint)
+        # Put the model in eval mode to fix dropout and other stuff
+        model.eval()
+
+        # Load the tractogram using a reference to make sure it can
+        # go into proper voxel space.
+        sft = load_tractogram(self.tractogram, self.reference)
+        sft.to_vox()
+
+        # Resample streamlines to a fixed number of points. This should be
+        # set by the model ? TODO?
+        resampled_streamlines = set_number_of_points(sft.streamlines, 128)
+        # Compute streamline features as the directions between points
+        dirs = np.diff(resampled_streamlines, axis=1)
+
+        # Load the features as torch tensors and predict
+        with torch.no_grad():
+            data = torch.as_tensor(dirs, dtype=torch.float, device='cuda')
+            predictions = model(data).cpu().numpy()
+
+        # Fetch the streamlines that passed the gauntlet
+        ids = np.argwhere(predictions > self.threshold).squeeze()
+        filtered = sft[ids]
+
+        # Save the filtered streamlines
+        print('Kept {}/{} streamlines.'.format(len(sft), len(filtered)))
+        save_tractogram(filtered, self.out, bbox_valid_check=False)
+
+        # TODO: Save all streamlines and add scores as dps
 
 
 def add_args(parser):
@@ -122,7 +125,7 @@ def main():
 
     parser, args = parse_args()
 
-    experiment = TractOracleTraining(vars(args))
+    experiment = TractOraclePredictor(vars(args))
     experiment.run()
 
 

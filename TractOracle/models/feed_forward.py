@@ -41,12 +41,12 @@ class FeedForwardOracle(LightningModule):
 
         self.save_hyperparameters()
 
-    def forward(self, x):
-        return self.network(x).squeeze()
-
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
+
+    def forward(self, x):
+        return self.network(x).squeeze()
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
