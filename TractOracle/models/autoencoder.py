@@ -86,7 +86,7 @@ class AutoencoderOracle(LightningModule):
         z = self.encoder(x)
 
         y_hat = self.network(z.squeeze()).squeeze()
-        pred_loss = F.mse_loss(y_hat, y)
+        pred_loss = F.mse_loss(y_hat.float(), y.float())
 
         x_hat = self.decoder(z)
         reconst_loss = F.mse_loss(x_hat, x)
@@ -101,7 +101,7 @@ class AutoencoderOracle(LightningModule):
         z = self.encoder(x)
 
         y_hat = self.network(z.squeeze()).squeeze()
-        pred_loss = F.mse_loss(y_hat, y)
+        pred_loss = F.mse_loss(y_hat.float(), y.float())
 
         x_hat = self.decoder(z)
         reconst_loss = F.mse_loss(x_hat, x)

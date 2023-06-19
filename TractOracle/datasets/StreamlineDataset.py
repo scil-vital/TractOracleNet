@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 
+from dipy.tracking.streamline import set_number_of_points
 from nibabel.streamlines import Tractogram
 from torch.utils.data import Dataset
 
@@ -15,6 +16,7 @@ class StreamlineDataset(Dataset):
         file_path: str,
         noise: float = 0.1,
         flip_p: float = 0.5,
+        dense: bool = True,
         device=None
     ):
         """
@@ -23,6 +25,7 @@ class StreamlineDataset(Dataset):
         self.file_path = file_path
         self.noise = noise
         self.flip_p = flip_p
+        self.dense = dense
         self.n_f = 0
         with h5py.File(self.file_path, 'r') as f:
             self.subject_list = list(f.keys())
@@ -106,9 +109,23 @@ class StreamlineDataset(Dataset):
         if np.random.random() < self.flip_p:
             streamline = np.flip(streamline, axis=0).copy()
 
-        # Convert the streamline points to directions
-        # Works really well
-        dirs = np.diff(streamline, axis=0)
+        # Learn a "dense" score by giving a partial score to partial
+        # streamlines
+        if self.dense:
+            new_len = np.random.randint(3, len(streamline))
+            partial_streamline = streamline[:new_len+1]
+            ratio = new_len / len(streamline)
+            sub_streamline = set_number_of_points(
+                partial_streamline, len(streamline))
+
+            # Convert the streamline points to directions
+            # Works really well
+            dirs = np.diff(sub_streamline, axis=0)
+            score *= ratio
+        else:
+            # Convert the streamline points to directions
+            # Works really well
+            dirs = np.diff(streamline, axis=0)
 
         return dirs, score
 

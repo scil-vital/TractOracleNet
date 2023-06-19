@@ -22,12 +22,20 @@ class StreamlineDataModule(pl.LightningDataModule):
         self.valid_pct = valid_pct
         self.total_pct = total_pct
 
-        self.data_loader_kwargs = {
+        self.train_data_loader_kwargs = {
             'batch_size': self.batch_size,
             'num_workers': self.num_workers,
             'persistent_workers': False,
             'pin_memory': False,
             'shuffle': True,
+        }
+
+        self.val_data_loader_kwargs = {
+            'batch_size': self.batch_size,
+            'num_workers': self.num_workers,
+            'persistent_workers': False,
+            'pin_memory': False,
+            'shuffle': False,
         }
 
     def prepare_data(self):
@@ -64,16 +72,16 @@ class StreamlineDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return DataLoader(
             self.streamline_train,
-            **self.data_loader_kwargs)
+            **self.train_data_loader_kwargs)
 
     def val_dataloader(self):
         return DataLoader(self.streamline_val,
-                          **self.data_loader_kwargs)
+                          **self.val_data_loader_kwargs)
 
     def test_dataloader(self):
         return DataLoader(self.streamline_test,
-                          **self.data_loader_kwargs)
+                          **self.val_data_loader_kwargs)
 
     def predict_dataloader(self):
         return DataLoader(self.streamline_test,
-                          **self.data_loader_kwargs)
+                          **self.val_data_loader_kwargs)

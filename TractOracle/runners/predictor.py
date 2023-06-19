@@ -32,6 +32,7 @@ class TractOraclePredictor():
         self.reference = train_dto['reference']
         self.threshold = train_dto['threshold']
         self.out = train_dto['out']
+        self.failed = train_dto['failed']
 
     def run(self):
         """
@@ -62,7 +63,8 @@ class TractOraclePredictor():
 
         # Load the tractogram using a reference to make sure it can
         # go into proper voxel space.
-        sft = load_tractogram(self.tractogram, self.reference)
+        sft = load_tractogram(self.tractogram, self.reference,
+                              bbox_valid_check=False)
         sft.to_vox()
 
         # Resample streamlines to a fixed number of points. This should be
@@ -78,11 +80,18 @@ class TractOraclePredictor():
 
         # Fetch the streamlines that passed the gauntlet
         ids = np.argwhere(predictions > self.threshold).squeeze()
+        failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
         filtered = sft[ids]
+        filtered.data_per_streamline['score'] = predictions[ids]
 
         # Save the filtered streamlines
-        print('Kept {}/{} streamlines.'.format(len(sft), len(filtered)))
+        print('Kept {}/{} streamlines.'.format(len(filtered), len(sft)))
         save_tractogram(filtered, self.out, bbox_valid_check=False)
+
+        if self.failed:
+            failed_sft = sft[failed_ids]
+            failed_sft.data_per_streamline['score'] = predictions[failed_ids]
+            save_tractogram(failed_sft, self.failed, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps
 
@@ -106,6 +115,8 @@ def add_args(parser):
                         help='Output file.')
     parser.add_argument('--threshold', type=float, default=0.5,
                         help='Threshold score for filtering.')
+    parser.add_argument('--failed', type=str, default=None,
+                        help='Output file for invalid streamlines.')
 
 
 def parse_args():
