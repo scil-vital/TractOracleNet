@@ -14,9 +14,9 @@ class StreamlineDataset(Dataset):
     def __init__(
         self,
         file_path: str,
-        noise: float = 0.1,
+        noise: float = 0.01,
         flip_p: float = 0.5,
-        dense: bool = True,
+        dense: bool = False,
         device=None
     ):
         """
@@ -99,11 +99,7 @@ class StreamlineDataset(Dataset):
         streamline = hdf_subject['data'][strml_idx]
         score = hdf_subject['scores'][strml_idx]
 
-        # Add noise to streamline points for robustness
-        if self.noise > 0.0:
-            dtype = streamline.dtype
-            streamline = streamline + np.random.normal(
-                loc=0.0, scale=self.noise, size=streamline.shape).astype(dtype)
+        score = (score * 2.) - 1.
 
         # Flip streamline for robustness
         if np.random.random() < self.flip_p:
@@ -115,17 +111,20 @@ class StreamlineDataset(Dataset):
             new_len = np.random.randint(3, len(streamline))
             partial_streamline = streamline[:new_len+1]
             ratio = new_len / len(streamline)
-            sub_streamline = set_number_of_points(
+            streamline = set_number_of_points(
                 partial_streamline, len(streamline))
 
-            # Convert the streamline points to directions
-            # Works really well
-            dirs = np.diff(sub_streamline, axis=0)
             score *= ratio
-        else:
-            # Convert the streamline points to directions
-            # Works really well
-            dirs = np.diff(streamline, axis=0)
+
+        # Add noise to streamline points for robustness
+        if self.noise > 0.0:
+            dtype = streamline.dtype
+            streamline = streamline + np.random.normal(
+                loc=0.0, scale=self.noise, size=streamline.shape).astype(dtype)
+
+        # Convert the streamline points to directions
+        # Works really well
+        dirs = np.diff(streamline, axis=0)
 
         return dirs, score
 

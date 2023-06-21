@@ -24,13 +24,11 @@ class TractOraclePredictor():
     ):
         """
         """
-        self.experiment_path = train_dto['path']
-        self.experiment = train_dto['experiment']
-        self.id = train_dto['id']
         self.checkpoint = train_dto['checkpoint']
         self.tractogram = train_dto['tractogram']
         self.reference = train_dto['reference']
         self.threshold = train_dto['threshold']
+        self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
         self.failed = train_dto['failed']
 
@@ -73,11 +71,18 @@ class TractOraclePredictor():
         # Compute streamline features as the directions between points
         dirs = np.diff(resampled_streamlines, axis=1)
 
-        # Load the features as torch tensors and predict
-        with torch.no_grad():
-            data = torch.as_tensor(dirs, dtype=torch.float, device='cuda')
-            predictions = model(data).cpu().numpy()
+        batch_size = self.batch_size
+        predictions = []
+        for i in range(0, len(dirs), batch_size):
+            j = i + batch_size
+            # Load the features as torch tensors and predict
+            with torch.no_grad():
+                data = torch.as_tensor(
+                    dirs[i:j], dtype=torch.float, device='cuda')
+                pred_batch = model(data).cpu().numpy().tolist()
+                predictions.extend(pred_batch)
 
+        predictions = np.asarray(predictions)
         # Fetch the streamlines that passed the gauntlet
         ids = np.argwhere(predictions > self.threshold).squeeze()
         failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
@@ -97,12 +102,6 @@ class TractOraclePredictor():
 
 
 def add_args(parser):
-    parser.add_argument('path', type=str,
-                        help='Path to experiment')
-    parser.add_argument('experiment',
-                        help='Name of experiment.')
-    parser.add_argument('id', type=str,
-                        help='ID of experiment.')
     parser.add_argument('checkpoint', type=str,
                         help='Checkpoint (.ckpt) containing hyperparameters '
                              'and weights of model.')
@@ -113,6 +112,8 @@ def add_args(parser):
                              'For .trk, can be \'same\'.')
     parser.add_argument('out', type=str,
                         help='Output file.')
+    parser.add_argument('--batch_size', type=int, default=1024,
+                        help='Batch size for predictions.')
     parser.add_argument('--threshold', type=float, default=0.5,
                         help='Threshold score for filtering.')
     parser.add_argument('--failed', type=str, default=None,
