@@ -7,6 +7,7 @@ import nibabel as nib
 import numpy as np
 
 from argparse import RawTextHelpFormatter
+from glob import glob
 from os.path import join
 from tqdm import tqdm
 
@@ -111,8 +112,7 @@ def add_subjects_to_hdf5(
         "Processing subject {}".format(subject_id),
 
         subject_config = config[subject_id]
-        hdf_subject = hdf_file.create_group(subject_id)
-        add_subject_to_hdf5(path, subject_config, hdf_subject, nb_points)
+        add_subject_to_hdf5(path, subject_config, hdf_file, nb_points)
 
 
 def add_subject_to_hdf5(
@@ -177,13 +177,23 @@ def process_all_streamlines(
     total = 0
     idx = 0
     print('Computing size of dataset.')
+    if "*" in streamlines_files[0]:
+        streamlines_files = glob(join(path, streamlines_files[0]))
     for bundle in tqdm(streamlines_files):
         total += get_number_of_streamlines(path, bundle, reference)
     print('Dataset will have {} streamlines'.format(total))
     print('Writing streamlines to dataset.')
+    idices = np.arange(total)
+    np.random.shuffle(idices)
     for bundle in tqdm(streamlines_files):
-        idx += process_bundle(
-            path, bundle, hdf_subject, reference, nb_points, total, idx)
+        ps = load_streamlines(join(path, bundle), reference)
+
+        len_ps = len(ps)
+        print('Processing {}'.format('/'.join((path, bundle))))
+        idx = idices[:len_ps]
+        process_bundle(
+            ps, hdf_subject, reference, nb_points, total, idx)
+        idices = idices[len_ps:]
 
 
 def get_number_of_streamlines(
@@ -195,15 +205,9 @@ def get_number_of_streamlines(
 
 
 def process_bundle(
-    path, f, hdf_subject, reference, nb_points, total, idx
+    ps, hdf_subject, reference, nb_points, total, idx
 ):
-    ps = load_streamlines(join(path, f), reference)
-
-    len_ps = len(ps)
-
     add_streamlines_to_hdf5(hdf_subject, ps, nb_points, total, idx)
-
-    return len_ps
 
 
 def load_streamlines(
@@ -224,7 +228,7 @@ def load_streamlines(
     """
 
     sft = load_tractogram(streamlines_file, reference, bbox_valid_check=False)
-    sft.to_center()
+    sft.to_corner()
     sft.to_vox()
 
     return sft
@@ -287,9 +291,12 @@ def append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx):
     streamlines = np.asarray(streamlines)
     scores = np.asarray(sft.data_per_streamline['score']).squeeze()
 
-    assert streamlines.shape[0] == scores.shape[0]
-    data_group[idx:idx + streamlines.shape[0], ...] = streamlines
-    scores_group[idx:idx + streamlines.shape[0]] = scores
+    assert streamlines.shape[0] == scores.shape[0], \
+        (streamlines.shape, scores.shape)
+
+    for i, st, sc in zip(idx, streamlines, scores):
+        data_group[i] = st
+        scores_group[i] = sc
 
 
 if __name__ == "__main__":

@@ -39,34 +39,36 @@ class AutoencoderOracle(LightningModule):
 
         # TODO: Make the autoencoder architecture parametrizable ?
 
+        factor = 2
+
         self.encoder = nn.Sequential(
-            nn.Conv1d(3, 32, 3, stride=2, padding=0),
+            nn.Conv1d(3, 32 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(32, 64, 3, stride=2, padding=0),
+            nn.Conv1d(32 * factor, 64 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(64, 128, 3, stride=2, padding=0),
+            nn.Conv1d(64 * factor, 128 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(128, 256, 3, stride=2, padding=0),
+            nn.Conv1d(128 * factor, 256 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(256, 512, 3, stride=2, padding=0),
+            nn.Conv1d(256 * factor, 512 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(512, 1024, 3, stride=1, padding=0))
+            nn.Conv1d(512 * factor, 1024 * factor, 3, stride=1, padding=0))
 
         self.network = make_fc_network(
-            self.layers, 1024, self.output_size)
+            self.layers, 1024 * factor, self.output_size)
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose1d(1024, 512, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(1024 * factor, 512 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(512, 256, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(512 * factor, 256 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(256, 128, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(256 * factor, 128 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(128, 64, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(128 * factor, 64 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(64, 32, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(64 * factor, 32 * factor, 3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(32, 3, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(32 * factor, 3, 3, stride=2, padding=0),
         )
 
         self.save_hyperparameters()
@@ -82,6 +84,10 @@ class AutoencoderOracle(LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
+
+        x = x.squeeze(0)
+        y = y.squeeze(0)
+
         x = x.permute(0, 2, 1)
         z = self.encoder(x)
 
@@ -97,6 +103,10 @@ class AutoencoderOracle(LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         x, y = val_batch
+
+        x = x.squeeze(0)
+        y = y.squeeze(0)
+
         x = x.permute(0, 2, 1)
         z = self.encoder(x)
 

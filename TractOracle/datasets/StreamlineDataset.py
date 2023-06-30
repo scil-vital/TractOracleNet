@@ -39,21 +39,19 @@ class StreamlineDataset(Dataset):
         print('Building indexes')
         set_list = list()
 
-        split_set = dataset_file
-
         f = self.archives
 
-        for subject in list(split_set.keys()):
-            streamlines = f[subject]['streamlines']['data']
-            for i in range(len(streamlines)):
-                k = (subject, i)
+        streamlines = f['streamlines']['data']
+        for i in range(len(streamlines)):
+            k = i
 
-                set_list.append(k)
+            set_list.append(k)
 
         return set_list
 
     def _compute_input_size(self):
-        L, P = self._get_one_input().shape
+        batch = self._get_one_input()
+        L, P = batch[0].shape
         return L * P
 
     @property
@@ -73,12 +71,12 @@ class StreamlineDataset(Dataset):
         """ TODO
         """
 
-        state_0, *_ = self[0]
+        state_0, *_ = self[[0, 1]]
         self.f.close()
         del self.f
         return state_0
 
-    def __getitem__(self, index):
+    def __getitem__(self, indices):
         """This method loads the hdf5, gets the subject and streamline id
         corresonding to the data index and returns the associated data and
         target.
@@ -88,16 +86,11 @@ class StreamlineDataset(Dataset):
         :return
             A tuple (input, target)
         """
-
-        # Map streamline total index -> subject.streamline_id
-        subject, strml_idx = self.indexes[index]
-
         f = self.archives
-
-        hdf_subject = f[subject]['streamlines']
-
-        streamline = hdf_subject['data'][strml_idx]
-        score = hdf_subject['scores'][strml_idx]
+        start, end = indices[0], indices[-1] + 1
+        hdf_subject = f['streamlines']
+        streamline = hdf_subject['data'][start:end]
+        score = hdf_subject['scores'][start:end]
 
         score = (score * 2.) - 1.
 
@@ -124,8 +117,9 @@ class StreamlineDataset(Dataset):
 
         # Convert the streamline points to directions
         # Works really well
-        dirs = np.diff(streamline, axis=0)
+        dirs = np.diff(streamline, axis=1)
 
+        score = (score + 1.) / 2.
         return dirs, score
 
     def __len__(self):
