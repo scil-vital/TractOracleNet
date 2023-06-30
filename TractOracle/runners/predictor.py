@@ -64,6 +64,7 @@ class TractOraclePredictor():
         sft = load_tractogram(self.tractogram, self.reference,
                               bbox_valid_check=False)
         sft.to_vox()
+        sft.to_corner()
 
         # Resample streamlines to a fixed number of points. This should be
         # set by the model ? TODO?
