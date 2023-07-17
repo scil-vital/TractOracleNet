@@ -9,6 +9,7 @@ from dipy.tracking.streamline import set_number_of_points
 
 from TractOracle.models.autoencoder import AutoencoderOracle
 from TractOracle.models.feed_forward import FeedForwardOracle
+from TractOracle.models.transformer import TransformerOracle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -50,7 +51,8 @@ class TractOraclePredictor():
         # The model's class is saved in hparams
         models = {
             'AutoencoderOracle': AutoencoderOracle,
-            'FeedForwardOracle': FeedForwardOracle
+            'FeedForwardOracle': FeedForwardOracle,
+            'TransformerOracle': TransformerOracle
         }
 
         # Load it from the checkpoint
@@ -84,6 +86,8 @@ class TractOraclePredictor():
                 predictions.extend(pred_batch)
 
         predictions = np.asarray(predictions)
+        print(predictions)
+
         # Fetch the streamlines that passed the gauntlet
         ids = np.argwhere(predictions > self.threshold).squeeze()
         failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)

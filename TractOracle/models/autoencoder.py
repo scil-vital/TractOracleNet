@@ -39,7 +39,7 @@ class AutoencoderOracle(LightningModule):
 
         # TODO: Make the autoencoder architecture parametrizable ?
 
-        factor = 2
+        factor = 1
 
         self.encoder = nn.Sequential(
             nn.Conv1d(3, 32 * factor, 3, stride=2, padding=0),
@@ -58,15 +58,20 @@ class AutoencoderOracle(LightningModule):
             self.layers, 1024 * factor, self.output_size)
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose1d(1024 * factor, 512 * factor, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(1024 * factor, 512 * factor,
+                               3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(512 * factor, 256 * factor, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(512 * factor, 256 * factor,
+                               3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(256 * factor, 128 * factor, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(256 * factor, 128 * factor,
+                               3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(128 * factor, 64 * factor, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(128 * factor, 64 * factor,
+                               3, stride=2, padding=0),
             nn.ReLU(),
-            nn.ConvTranspose1d(64 * factor, 32 * factor, 3, stride=2, padding=0),
+            nn.ConvTranspose1d(64 * factor, 32 * factor,
+                               3, stride=2, padding=0),
             nn.ReLU(),
             nn.ConvTranspose1d(32 * factor, 3, 3, stride=2, padding=0),
         )

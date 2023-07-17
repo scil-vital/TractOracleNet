@@ -1,7 +1,6 @@
 import h5py
 import numpy as np
 
-from dipy.tracking.streamline import set_number_of_points
 from nibabel.streamlines import Tractogram
 from torch.utils.data import Dataset
 
@@ -14,7 +13,7 @@ class StreamlineDataset(Dataset):
     def __init__(
         self,
         file_path: str,
-        noise: float = 0.01,
+        noise: float = 0.1,
         flip_p: float = 0.5,
         dense: bool = False,
         device=None
@@ -40,7 +39,7 @@ class StreamlineDataset(Dataset):
         set_list = list()
 
         f = self.archives
-
+        print(list(f.keys()))
         streamlines = f['streamlines']['data']
         for i in range(len(streamlines)):
             k = i
@@ -77,49 +76,51 @@ class StreamlineDataset(Dataset):
         return state_0
 
     def __getitem__(self, indices):
-        """This method loads the hdf5, gets the subject and streamline id
-        corresonding to the data index and returns the associated data and
-        target.
+        """ TODO
 
         :arg
-            index: the index of the slice within patient data
+            indices: TODO
         :return
             A tuple (input, target)
         """
-        f = self.archives
-        start, end = indices[0], indices[-1] + 1
-        hdf_subject = f['streamlines']
-        streamline = hdf_subject['data'][start:end]
-        score = hdf_subject['scores'][start:end]
 
-        score = (score * 2.) - 1.
+        f = self.archives
+
+        hdf_subject = f['streamlines']
+        data = hdf_subject['data']
+        scores_data = hdf_subject['scores']
+
+        start, end = indices[0], indices[-1] + 1
+
+        # Handle rollover indices
+        if start > end:
+            batch_end = max(indices)
+            batch_start = min(indices)
+            streamlines = np.concatenate(
+                (data[start:batch_end], data[batch_start:end]), axis=0)
+            score = np.concatenate(
+                (scores_data[start:batch_end], scores_data[batch_start:end]),
+                axis=0)
+        # Slice as usual
+        else:
+            streamlines = hdf_subject['data'][start:end]
+            score = hdf_subject['scores'][start:end]
 
         # Flip streamline for robustness
         if np.random.random() < self.flip_p:
-            streamline = np.flip(streamline, axis=0).copy()
-
-        # Learn a "dense" score by giving a partial score to partial
-        # streamlines
-        if self.dense:
-            new_len = np.random.randint(3, len(streamline))
-            partial_streamline = streamline[:new_len+1]
-            ratio = new_len / len(streamline)
-            streamline = set_number_of_points(
-                partial_streamline, len(streamline))
-
-            score *= ratio
+            streamlines = np.flip(streamlines, axis=1).copy()
 
         # Add noise to streamline points for robustness
         if self.noise > 0.0:
-            dtype = streamline.dtype
-            streamline = streamline + np.random.normal(
-                loc=0.0, scale=self.noise, size=streamline.shape).astype(dtype)
+            dtype = streamlines.dtype
+            streamlines = streamlines + np.random.normal(
+                loc=0.0, scale=self.noise, size=streamlines.shape
+            ).astype(dtype)
 
         # Convert the streamline points to directions
         # Works really well
-        dirs = np.diff(streamline, axis=1)
+        dirs = np.diff(streamlines, axis=1)
 
-        score = (score + 1.) / 2.
         return dirs, score
 
     def __len__(self):
