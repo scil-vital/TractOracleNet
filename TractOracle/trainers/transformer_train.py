@@ -123,7 +123,7 @@ def add_args(parser):
                         help='Training dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=2**13,
+    parser.add_argument('--batch_size', type=int, default=1024+512,
                         help='TODO')
     parser.add_argument('--num_workers', type=int, default=16,
                         help='TODO')

@@ -26,31 +26,15 @@ class StreamlineDataset(Dataset):
         self.flip_p = flip_p
         self.dense = dense
         self.n_f = 0
-        with h5py.File(self.file_path, 'r') as f:
-            self.subject_list = list(f.keys())
-            self.indexes = \
-                self._build_indexes(f)
-            self.input_size = self._compute_input_size()
-
-    def _build_indexes(self, dataset_file):
-        """ TODO
-        """
-        print('Building indexes')
-        set_list = list()
+        self.input_size = self._compute_input_size()
 
         f = self.archives
-        print(list(f.keys()))
         streamlines = f['streamlines']['data']
-        for i in range(len(streamlines)):
-            k = i
-
-            set_list.append(k)
-
-        return set_list
+        self.length = len(streamlines)
 
     def _compute_input_size(self):
         batch = self._get_one_input()
-        L, P = batch[0].shape
+        L, P = batch.shape
         return L * P
 
     @property
@@ -70,12 +54,12 @@ class StreamlineDataset(Dataset):
         """ TODO
         """
 
-        state_0, *_ = self[[0, 1]]
+        state_0, *_ = self[0]
         self.f.close()
         del self.f
         return state_0
 
-    def __getitem__(self, indices):
+    def __getitem__(self, index):
         """ TODO
 
         :arg
@@ -90,36 +74,24 @@ class StreamlineDataset(Dataset):
         data = hdf_subject['data']
         scores_data = hdf_subject['scores']
 
-        start, end = indices[0], indices[-1] + 1
+        streamline = data[index]
 
-        # Handle rollover indices
-        if start > end:
-            batch_end = max(indices)
-            batch_start = min(indices)
-            streamlines = np.concatenate(
-                (data[start:batch_end], data[batch_start:end]), axis=0)
-            score = np.concatenate(
-                (scores_data[start:batch_end], scores_data[batch_start:end]),
-                axis=0)
-        # Slice as usual
-        else:
-            streamlines = hdf_subject['data'][start:end]
-            score = hdf_subject['scores'][start:end]
+        score = scores_data[index]
 
         # Flip streamline for robustness
         if np.random.random() < self.flip_p:
-            streamlines = np.flip(streamlines, axis=1).copy()
+            streamline = np.flip(streamline, axis=0).copy()
 
         # Add noise to streamline points for robustness
         if self.noise > 0.0:
-            dtype = streamlines.dtype
-            streamlines = streamlines + np.random.normal(
-                loc=0.0, scale=self.noise, size=streamlines.shape
+            dtype = streamline.dtype
+            streamline = streamline + np.random.normal(
+                loc=0.0, scale=self.noise, size=streamline.shape
             ).astype(dtype)
 
         # Convert the streamline points to directions
         # Works really well
-        dirs = np.diff(streamlines, axis=1)
+        dirs = np.diff(streamline, axis=0)
 
         return dirs, score
 
@@ -128,7 +100,7 @@ class StreamlineDataset(Dataset):
         Return the length of the dataset, i.e. the number
         of streamlines in the dataset.
         """
-        return int(len(self.indexes))
+        return self.length
 
     def render(
         self,

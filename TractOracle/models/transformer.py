@@ -1,9 +1,11 @@
+import math
 import torch
+
 from torch import nn
 from torch.nn import functional as F
 from lightning.pytorch import LightningModule
 
-from TractOracle.models.utils import calc_accuracy
+from TractOracle.models.utils import calc_accuracy, PositionalEncoding
 
 
 class TransformerOracle(LightningModule):
@@ -19,17 +21,19 @@ class TransformerOracle(LightningModule):
         self.n_head = n_head
         self.n_layers = n_layers
 
-        embedding_size = 512
+        self.embedding_size = 16
 
         layer = nn.TransformerEncoderLayer(
-            embedding_size, n_head, batch_first=True)
+            self.embedding_size, n_head, batch_first=True)
 
         self.embedding = nn.Sequential(
-            *(nn.Flatten(),
-              nn.Linear(input_size, embedding_size),
+            *(nn.Linear(3, self.embedding_size),
               nn.ReLU()))
+
+        self.pos_encoding = PositionalEncoding(
+            self.embedding_size, max_len=input_size//3)
         self.bert = nn.TransformerEncoder(layer, self.n_layers)
-        self.head = nn.Linear(embedding_size, output_size)
+        self.head = nn.Linear(self.embedding_size, output_size)
 
         self.save_hyperparameters()
 
@@ -44,18 +48,24 @@ class TransformerOracle(LightningModule):
         }
 
     def forward(self, x):
+        x = self.embedding(x) * math.sqrt(self.embedding_size)
 
-        embed = self.embedding(x)
-        hidden = self.bert(embed)
-        y = self.head(hidden)
+        encoding = self.pos_encoding(x)
+
+        hidden = self.bert(encoding)
+
+        pooled = hidden.mean(dim=1)
+
+        y = self.head(pooled)
 
         return y.squeeze(-1)
 
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
 
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+        if len(x.shape) > 3:
+            x = x.squeeze(0)
+            y = y.squeeze(0)
 
         y_hat = self(x)
         pred_loss = F.mse_loss(y_hat, y)
@@ -72,8 +82,9 @@ class TransformerOracle(LightningModule):
     def validation_step(self, val_batch, batch_idx):
         x, y = val_batch
 
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+        if len(x.shape) > 3:
+            x = x.squeeze(0)
+            y = y.squeeze(0)
 
         y_hat = self(x)
         pred_loss = F.mse_loss(y_hat, y)

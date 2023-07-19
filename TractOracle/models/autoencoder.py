@@ -90,8 +90,9 @@ class AutoencoderOracle(LightningModule):
     def training_step(self, train_batch, batch_idx):
         x, y = train_batch
 
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+        if len(x.shape) > 3:
+            x = x.squeeze(0)
+            y = y.squeeze(0)
 
         x = x.permute(0, 2, 1)
         z = self.encoder(x)
@@ -109,8 +110,9 @@ class AutoencoderOracle(LightningModule):
     def validation_step(self, val_batch, batch_idx):
         x, y = val_batch
 
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+        if len(x.shape) > 3:
+            x = x.squeeze(0)
+            y = y.squeeze(0)
 
         x = x.permute(0, 2, 1)
         z = self.encoder(x)

@@ -290,7 +290,7 @@ def append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx):
     streamlines = set_number_of_points(sft.streamlines, nb_points)
     streamlines = np.asarray(streamlines)
     scores = np.asarray(sft.data_per_streamline['score']).squeeze(-1)
-    print(scores)
+
     assert streamlines.shape[0] == scores.shape[0], \
         (streamlines.shape, scores.shape)
 
