@@ -55,7 +55,7 @@ class AutoencoderOracle(LightningModule):
             nn.Conv1d(512 * factor, 1024 * factor, 3, stride=1, padding=0))
 
         self.network = make_fc_network(
-            self.layers, 1024 * factor, self.output_size)
+            self.layers, 1024 * factor, self.output_size, last_activation=nn.Sigmoid)
 
         self.decoder = nn.Sequential(
             nn.ConvTranspose1d(1024 * factor, 512 * factor,

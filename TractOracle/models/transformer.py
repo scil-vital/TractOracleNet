@@ -21,7 +21,7 @@ class TransformerOracle(LightningModule):
         self.n_head = n_head
         self.n_layers = n_layers
 
-        self.embedding_size = 16
+        self.embedding_size = 32
 
         layer = nn.TransformerEncoderLayer(
             self.embedding_size, n_head, batch_first=True)
@@ -34,6 +34,8 @@ class TransformerOracle(LightningModule):
             self.embedding_size, max_len=input_size//3)
         self.bert = nn.TransformerEncoder(layer, self.n_layers)
         self.head = nn.Linear(self.embedding_size, output_size)
+
+        self.sig = nn.Sigmoid()
 
         self.save_hyperparameters()
 
@@ -57,6 +59,8 @@ class TransformerOracle(LightningModule):
         pooled = hidden.mean(dim=1)
 
         y = self.head(pooled)
+
+        y = self.sig(y)
 
         return y.squeeze(-1)
 
