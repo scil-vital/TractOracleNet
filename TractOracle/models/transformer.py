@@ -49,6 +49,19 @@ class TransformerOracle(LightningModule):
             "monitor": "pred_train_loss"
         }
 
+    def forward_with_hidden(self, x):
+        x = self.embedding(x) * math.sqrt(self.embedding_size)
+
+        encoding = self.pos_encoding(x)
+
+        hidden = self.bert(encoding)
+
+        pooled = hidden.mean(dim=1)
+
+        y = self.head(pooled)
+
+        return y.squeeze(-1), hidden
+
     def forward(self, x):
         x = self.embedding(x) * math.sqrt(self.embedding_size)
 

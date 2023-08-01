@@ -32,6 +32,7 @@ class TractOraclePredictor():
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
         self.failed = train_dto['failed']
+        self.all = train_dto['all']
 
     def run(self):
         """
@@ -76,32 +77,43 @@ class TractOraclePredictor():
 
         batch_size = self.batch_size
         predictions = []
+        hiddens = []
         for i in range(0, len(dirs), batch_size):
             j = i + batch_size
             # Load the features as torch tensors and predict
             with torch.no_grad():
                 data = torch.as_tensor(
                     dirs[i:j], dtype=torch.float, device='cuda')
-                pred_batch = model(data).cpu().numpy().tolist()
-                predictions.extend(pred_batch)
+                pred_batch, hidden = model.forward_with_hidden(
+                    data)
+                predictions.extend(pred_batch.cpu().numpy().tolist())
+                hiddens.extend(hidden.cpu().numpy().tolist())
 
         predictions = np.asarray(predictions)
+        hiddens = np.asarray(hiddens)
         print(predictions)
 
-        # Fetch the streamlines that passed the gauntlet
-        ids = np.argwhere(predictions > self.threshold).squeeze()
-        failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
-        filtered = sft[ids]
-        filtered.data_per_streamline['score'] = predictions[ids]
+        if not self.all:
+            # Fetch the streamlines that passed the gauntlet
+            ids = np.argwhere(predictions > self.threshold).squeeze()
+            failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
+            filtered = sft[ids]
+            filtered.data_per_streamline['score'] = predictions[ids]
 
-        # Save the filtered streamlines
-        print('Kept {}/{} streamlines.'.format(len(filtered), len(sft)))
-        save_tractogram(filtered, self.out, bbox_valid_check=False)
+            # Save the filtered streamlines
+            print('Kept {}/{} streamlines.'.format(len(filtered), len(sft)))
+            save_tractogram(filtered, self.out, bbox_valid_check=False)
 
-        if self.failed:
-            failed_sft = sft[failed_ids]
-            failed_sft.data_per_streamline['score'] = predictions[failed_ids]
-            save_tractogram(failed_sft, self.failed, bbox_valid_check=False)
+            if self.failed:
+                failed_sft = sft[failed_ids]
+                failed_sft.data_per_streamline['score'] = \
+                    predictions[failed_ids]
+                save_tractogram(failed_sft, self.failed,
+                                bbox_valid_check=False)
+        else:
+            sft.data_per_streamline['score'] = predictions
+            sft.data_per_streamline['hidden'] = hiddens
+            save_tractogram(sft, self.out, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps
 
@@ -121,8 +133,12 @@ def add_args(parser):
                         help='Batch size for predictions.')
     parser.add_argument('--threshold', type=float, default=0.5,
                         help='Threshold score for filtering.')
-    parser.add_argument('--failed', type=str, default=None,
-                        help='Output file for invalid streamlines.')
+    g = parser.add_mutually_exclusive_group()
+    g.add_argument('--all', action='store_true',
+                   help='Output a tractogram containing all streamlines '
+                   'and scores.')
+    g.add_argument('--failed', type=str, default=None,
+                   help='Output file for invalid streamlines.')
 
 
 def parse_args():
