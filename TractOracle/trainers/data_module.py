@@ -16,7 +16,7 @@ class StreamlineDataModule(pl.LightningDataModule):
         train_file: str,
         test_file: str,
         batch_size: int = 1024,
-        num_workers: int = 8,
+        num_workers: int = 30,
         valid_pct=0.2,
         total_pct=1.,
     ):
@@ -32,8 +32,9 @@ class StreamlineDataModule(pl.LightningDataModule):
 
         self.data_loader_kwargs = {
             'num_workers': self.num_workers,
+            'prefetch_factor': 8,
             'persistent_workers': False,
-            'pin_memory': False,
+            'pin_memory': True,
         }
         if not self.batch_dataset:
             self.data_loader_kwargs.update({

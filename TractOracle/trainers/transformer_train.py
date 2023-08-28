@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import torch
-
 from argparse import RawTextHelpFormatter
 from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.loggers import CometLogger
@@ -10,8 +8,6 @@ from os.path import join
 
 from TractOracle.models.transformer import TransformerOracle
 from TractOracle.trainers.data_module import StreamlineDataModule
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TractOracleTransformerTraining():
@@ -87,7 +83,8 @@ class TractOracleTransformerTraining():
                           num_sanity_val_steps=0,
                           max_epochs=self.max_ep,
                           enable_checkpointing=True,
-                          default_root_dir=root_dir)
+                          default_root_dir=root_dir,
+                          precision=16)
 
         trainer.fit(model, dm, ckpt_path=self.checkpoint)
 
@@ -123,9 +120,9 @@ def add_args(parser):
                         help='Training dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=1024+512,
+    parser.add_argument('--batch_size', type=int, default=(2**11)+512,
                         help='TODO')
-    parser.add_argument('--num_workers', type=int, default=16,
+    parser.add_argument('--num_workers', type=int, default=30,
                         help='TODO')
     parser.add_argument('--checkpoint', type=str,
                         help='TODO')

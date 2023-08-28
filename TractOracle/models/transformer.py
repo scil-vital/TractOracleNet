@@ -23,6 +23,8 @@ class TransformerOracle(LightningModule):
 
         self.embedding_size = 32
 
+        self.cls_token = nn.Parameter(torch.randn((3)))
+
         layer = nn.TransformerEncoderLayer(
             self.embedding_size, n_head, batch_first=True)
 
@@ -31,7 +33,7 @@ class TransformerOracle(LightningModule):
               nn.ReLU()))
 
         self.pos_encoding = PositionalEncoding(
-            self.embedding_size, max_len=input_size//3)
+            self.embedding_size, max_len=(input_size//3) + 1)
         self.bert = nn.TransformerEncoder(layer, self.n_layers)
         self.head = nn.Linear(self.embedding_size, output_size)
 
@@ -49,29 +51,18 @@ class TransformerOracle(LightningModule):
             "monitor": "pred_train_loss"
         }
 
-    def forward_with_hidden(self, x):
-        x = self.embedding(x) * math.sqrt(self.embedding_size)
-
-        encoding = self.pos_encoding(x)
-
-        hidden = self.bert(encoding)
-
-        pooled = hidden.mean(dim=1)
-
-        y = self.head(pooled)
-
-        return y.squeeze(-1), hidden
-
     def forward(self, x):
+
+        N, L, D = x.shape  # Batch size, length of sequence, nb. of dims
+        cls_tokens = self.cls_token.repeat(N, 1, 1)
+        x = torch.cat((cls_tokens, x), dim=1)
         x = self.embedding(x) * math.sqrt(self.embedding_size)
 
         encoding = self.pos_encoding(x)
 
         hidden = self.bert(encoding)
 
-        pooled = hidden.mean(dim=1)
-
-        y = self.head(pooled)
+        y = self.head(hidden[:, 0])
 
         y = self.sig(y)
 

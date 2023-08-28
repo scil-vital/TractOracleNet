@@ -77,20 +77,16 @@ class TractOraclePredictor():
 
         batch_size = self.batch_size
         predictions = []
-        hiddens = []
         for i in range(0, len(dirs), batch_size):
             j = i + batch_size
             # Load the features as torch tensors and predict
             with torch.no_grad():
                 data = torch.as_tensor(
                     dirs[i:j], dtype=torch.float, device='cuda')
-                pred_batch, hidden = model.forward_with_hidden(
-                    data)
+                pred_batch = model(data)
                 predictions.extend(pred_batch.cpu().numpy().tolist())
-                hiddens.extend(hidden.cpu().numpy().tolist())
 
         predictions = np.asarray(predictions)
-        hiddens = np.asarray(hiddens)
         print(predictions)
 
         if not self.all:
@@ -111,8 +107,8 @@ class TractOraclePredictor():
                 save_tractogram(failed_sft, self.failed,
                                 bbox_valid_check=False)
         else:
+            sft.streamlines = resampled_streamlines
             sft.data_per_streamline['score'] = predictions
-            sft.data_per_streamline['hidden'] = hiddens
             save_tractogram(sft, self.out, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps

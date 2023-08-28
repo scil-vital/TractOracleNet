@@ -15,7 +15,7 @@ class StreamlineDataset(Dataset):
         file_path: str,
         noise: float = 0.1,
         flip_p: float = 0.5,
-        dense: bool = False,
+        dense: bool = True,
         device=None
     ):
         """
@@ -25,6 +25,7 @@ class StreamlineDataset(Dataset):
         self.noise = noise
         self.flip_p = flip_p
         self.dense = dense
+        self.partial = False
         self.n_f = 0
         self.input_size = self._compute_input_size()
 

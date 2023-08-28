@@ -1,5 +1,8 @@
 import numpy as np
 
+from dipy.tracking.streamline import set_number_of_points
+from nibabel.streamlines.array_sequence import ArraySequence
+
 from TractOracle.datasets.StreamlineDataset import StreamlineDataset
 
 
@@ -52,6 +55,15 @@ class StreamlineBatchDataset(StreamlineDataset):
         # Flip streamline for robustness
         if np.random.random() < self.flip_p:
             streamlines = np.flip(streamlines, axis=1).copy()
+
+        if self.dense:
+            new_length = np.random.randint(3, streamlines.shape[1])
+            if self.partial:
+                old_length = streamlines.shape[1]
+                score *= new_length / old_length
+            array_seq = ArraySequence(streamlines[:, :new_length])
+            streamlines = set_number_of_points(array_seq, 128)
+            streamlines = np.asarray(streamlines)
 
         # Add noise to streamline points for robustness
         if self.noise > 0.0:
