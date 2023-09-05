@@ -6,6 +6,7 @@ import torch
 from argparse import RawTextHelpFormatter
 from dipy.io.streamline import load_tractogram, save_tractogram
 from dipy.tracking.streamline import set_number_of_points
+from tqdm import tqdm
 
 from TractOracle.models.autoencoder import AutoencoderOracle
 from TractOracle.models.feed_forward import FeedForwardOracle
@@ -66,51 +67,31 @@ class TractOraclePredictor():
         # go into proper voxel space.
         sft = load_tractogram(self.tractogram, self.reference,
                               bbox_valid_check=False)
-
         sft.to_vox()
         sft.to_corner()
 
-        # Resample streamlines to a fixed number of points. This should be
-        # set by the model ? TODO?
-        resampled_streamlines = set_number_of_points(sft.streamlines, 128)
-        # Compute streamline features as the directions between points
-        dirs = np.diff(resampled_streamlines, axis=1)
+        lengths = [len(s) for s in sft.streamlines]
+        scores_per_point = np.zeros((len(lengths), max(lengths), 1))
 
-        batch_size = self.batch_size
-        predictions = []
-        for i in range(0, dirs.shape[0], batch_size):
-            j = i + batch_size
-            # Load the features as torch tensors and predict
-            batch_dirs = dirs[i:j, :, :]
+        for i, s in enumerate(tqdm(sft.streamlines)):
+            length = len(scores_per_point[i])
+            streamlines = [s[:l] for l in range(3, length)]
+
+            # Resample streamlines to a fixed number of points. This should be
+            # set by the model ? TODO?
+            resampled_streamlines = set_number_of_points(streamlines, 128)
+            # Compute streamline features as the directions between points
+            dirs = np.diff(resampled_streamlines, axis=1)
+
             with torch.no_grad():
                 data = torch.as_tensor(
-                    batch_dirs, dtype=torch.float, device='cuda')
-                pred_batch = model(data)
-                predictions.extend(pred_batch.cpu().numpy().tolist())
+                    dirs, dtype=torch.float, device='cuda')
+                pred_batch = model(data).cpu().numpy()
 
-        predictions = np.asarray(predictions)
-
-        if not self.all:
-            # Fetch the streamlines that passed the gauntlet
-            ids = np.argwhere(predictions > self.threshold).squeeze()
-            failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
-            filtered = sft[ids]
-            filtered.data_per_streamline['score'] = predictions[ids]
-
-            # Save the filtered streamlines
-            print('Kept {}/{} streamlines ({}%).'.format(len(filtered),
-                  len(sft), (len(filtered) / len(sft))))
-            save_tractogram(filtered, self.out, bbox_valid_check=False)
-
-            if self.failed:
-                failed_sft = sft[failed_ids]
-                failed_sft.data_per_streamline['score'] = \
-                    predictions[failed_ids]
-                save_tractogram(failed_sft, self.failed,
-                                bbox_valid_check=False)
-        else:
-            sft.data_per_streamline['score'] = predictions
-            save_tractogram(sft, self.out, bbox_valid_check=False)
+            scores_per_point[i][3:] = pred_batch[:, None]
+        sft.data_per_point['score'] = [list(scores_per_point[i, :l])
+                                       for i, l in enumerate(lengths)]
+        save_tractogram(sft, self.out, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps
 
@@ -126,7 +107,7 @@ def add_args(parser):
                              'For .trk, can be \'same\'.')
     parser.add_argument('out', type=str,
                         help='Output file.')
-    parser.add_argument('--batch_size', type=int, default=4096,
+    parser.add_argument('--batch_size', type=int, default=1024,
                         help='Batch size for predictions.')
     parser.add_argument('--threshold', type=float, default=0.5,
                         help='Threshold score for filtering.')
