@@ -25,7 +25,7 @@ class StreamlineDataset(Dataset):
         self.noise = noise
         self.flip_p = flip_p
         self.dense = dense
-        self.partial = False
+        self.partial = True
         self.n_f = 0
         self.input_size = self._compute_input_size()
 

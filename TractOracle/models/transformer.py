@@ -78,12 +78,10 @@ class TransformerOracle(LightningModule):
         y_hat = self(x)
         pred_loss = F.mse_loss(y_hat, y)
 
-        acc_05 = calc_accuracy(y, y_hat, threshold=0.5)
-        acc_075 = calc_accuracy(y, y_hat, threshold=0.75)
+        acc_05 = calc_accuracy(y, y_hat)
 
         self.log('pred_train_loss', pred_loss, on_step=False, on_epoch=True)
         self.log('pred_train_acc_0.5', acc_05, on_step=False, on_epoch=True)
-        self.log('pred_train_acc_0.75', acc_075, on_step=False, on_epoch=True)
 
         return pred_loss
 
@@ -97,9 +95,7 @@ class TransformerOracle(LightningModule):
         y_hat = self(x)
         pred_loss = F.mse_loss(y_hat, y)
 
-        acc_05 = calc_accuracy(y, y_hat, threshold=0.5)
-        acc_075 = calc_accuracy(y, y_hat, threshold=0.75)
+        acc_05 = calc_accuracy(y, y_hat)
 
         self.log('pred_val_loss', pred_loss, on_step=False, on_epoch=True)
         self.log('pred_val_acc_0.5', acc_05, on_step=False, on_epoch=True)
-        self.log('pred_val_acc_0.75', acc_075, on_step=False, on_epoch=True)

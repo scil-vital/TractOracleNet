@@ -4,8 +4,10 @@ import torch
 from torch import nn, Tensor
 
 
-def calc_accuracy(y, y_hat, threshold=0.5):
-    return ((y_hat > threshold).int() == y.int()).float().mean()
+def calc_accuracy(y, y_hat):
+    preds = (y_hat > (y / 2.)).int()
+    targets = (y > 0.0).int()
+    return (preds == targets).float().mean()
 
 
 class PositionalEncoding(nn.Module):

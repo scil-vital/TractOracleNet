@@ -4,7 +4,7 @@ import torch
 
 from argparse import RawTextHelpFormatter
 from lightning.pytorch.trainer import Trainer
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import CometLogger
 from os.path import join
 # from lightning.pytorch.tuner import Tuner
 
@@ -67,13 +67,25 @@ class TractOracleTraining():
         root_dir = join(self.experiment_path, self.experiment, self.id)
 
         # Training
-        logger = TensorBoardLogger(root_dir, name=self.id)
-        trainer = Trainer(logger=logger,
+        comet_logger = CometLogger(
+            project_name="tractoracle",
+            experiment_name='-'.join((self.experiment, self.id)))
+
+        # Log parameters
+        comet_logger.log_hyperparams({
+            "model": FeedForwardOracle.__name__,
+            "lr": self.lr,
+            "max_ep": self.max_ep,
+            "n_layers": self.layers,
+            "batch_size": self.batch_size})
+
+        trainer = Trainer(logger=comet_logger,
+                          log_every_n_steps=1,
                           num_sanity_val_steps=0,
                           max_epochs=self.max_ep,
                           enable_checkpointing=True,
                           default_root_dir=root_dir,
-                          profiler='simple')
+                          precision=16)
 
         trainer.fit(model, dm, ckpt_path=self.checkpoint)
 
@@ -107,7 +119,7 @@ def add_args(parser):
                         help='Training dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=2**12,
+    parser.add_argument('--batch_size', type=int, default=2**14,
                         help='TODO')
     parser.add_argument('--num_workers', type=int, default=12,
                         help='TODO')
