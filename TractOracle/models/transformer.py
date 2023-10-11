@@ -10,7 +10,15 @@ from TractOracle.models.utils import calc_accuracy, PositionalEncoding
 
 class TransformerOracle(LightningModule):
 
-    def __init__(self, input_size, output_size, n_head, n_layers, lr):
+    def __init__(
+        self,
+        input_size,
+        output_size,
+        n_head,
+        n_layers,
+        lr,
+        loss=nn.MSELoss
+    ):
         super(TransformerOracle, self).__init__()
 
         self.hparams["name"] = self.__class__.__name__
@@ -36,6 +44,8 @@ class TransformerOracle(LightningModule):
             self.embedding_size, max_len=(input_size//3) + 1)
         self.bert = nn.TransformerEncoder(layer, self.n_layers)
         self.head = nn.Linear(self.embedding_size, output_size)
+
+        self.loss = loss()
 
         self.sig = nn.Sigmoid()
 
@@ -64,7 +74,8 @@ class TransformerOracle(LightningModule):
 
         y = self.head(hidden[:, 0])
 
-        y = self.sig(y)
+        if self.loss is not nn.BCEWithLogitsLoss:
+            y = self.sig(y)
 
         return y.squeeze(-1)
 
@@ -76,7 +87,7 @@ class TransformerOracle(LightningModule):
             y = y.squeeze(0)
 
         y_hat = self(x)
-        pred_loss = F.mse_loss(y_hat, y)
+        pred_loss = F.binary_cross_entropy_with_logits(y_hat, y)
 
         acc_05 = calc_accuracy(y, y_hat)
 
@@ -93,7 +104,7 @@ class TransformerOracle(LightningModule):
             y = y.squeeze(0)
 
         y_hat = self(x)
-        pred_loss = F.mse_loss(y_hat, y)
+        pred_loss = F.binary_cross_entropy_with_logits(y_hat, y)
 
         acc_05 = calc_accuracy(y, y_hat)
 

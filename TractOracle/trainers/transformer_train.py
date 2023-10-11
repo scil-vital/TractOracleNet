@@ -38,6 +38,7 @@ class TractOracleTransformerTraining():
 
         #  Tracking parameters
         self.train_dataset_file = train_dto['train_dataset_file']
+        self.val_dataset_file = train_dto['val_dataset_file']
         self.test_dataset_file = train_dto['test_dataset_file']
 
     def train(
@@ -59,7 +60,8 @@ class TractOracleTransformerTraining():
                 self.n_layers, self.lr)
 
         dm = StreamlineDataModule(
-            self.train_dataset_file, self.test_dataset_file,
+            self.train_dataset_file, self.val_dataset_file,
+            self.test_dataset_file,
             self.batch_size, self.num_workers)
 
         root_dir = join(self.experiment_path, self.experiment, self.id)
@@ -118,9 +120,11 @@ def add_args(parser):
                         help='Number of decoder layers.')
     parser.add_argument('train_dataset_file', type=str,
                         help='Training dataset.')
+    parser.add_argument('val_dataset_file', type=str,
+                        help='Validation dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=(2**11)+512,
+    parser.add_argument('--batch_size', type=int, default=2**11,
                         help='TODO')
     parser.add_argument('--num_workers', type=int, default=30,
                         help='TODO')

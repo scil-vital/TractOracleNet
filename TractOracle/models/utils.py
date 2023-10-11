@@ -5,9 +5,7 @@ from torch import nn, Tensor
 
 
 def calc_accuracy(y, y_hat):
-    preds = (y_hat > (y / 2.)).int()
-    targets = (y > 0.0).int()
-    return (preds == targets).float().mean()
+    return ((y_hat > 0.5).int() == y.int()).float().mean()
 
 
 class PositionalEncoding(nn.Module):

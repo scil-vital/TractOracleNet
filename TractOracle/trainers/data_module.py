@@ -14,6 +14,7 @@ class StreamlineDataModule(pl.LightningDataModule):
     def __init__(
         self,
         train_file: str,
+        val_file: str,
         test_file: str,
         batch_size: int = 1024,
         num_workers: int = 30,
@@ -22,6 +23,7 @@ class StreamlineDataModule(pl.LightningDataModule):
     ):
         super().__init__()
         self.train_file = train_file
+        self.val_file = val_file
         self.test_file = test_file
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -52,17 +54,19 @@ class StreamlineDataModule(pl.LightningDataModule):
 
             if self.batch_dataset:
 
-                streamline_train_full = StreamlineBatchDataset(
-                    self.train_file)
+                self.streamline_train = StreamlineBatchDataset(
+                    self.train_file, dense=True, partial=False)
 
-                all_indices = np.arange(len(streamline_train_full))
-                train_size = int(
-                    len(streamline_train_full) * (1 - self.valid_pct))
-                train_indices = all_indices[:train_size]
-                val_indices = all_indices[train_size:]
-                self.streamline_train, self.streamline_val = \
-                    (Subset(streamline_train_full, train_indices),
-                     Subset(streamline_train_full, val_indices))
+                self.streamline_val = StreamlineBatchDataset(
+                    self.val_file, dense=False, partial=False)
+                # all_indices = np.arange(len(streamline_train_full))
+                # train_size = int(
+                #     len(streamline_train_full) * (1 - self.valid_pct))
+                # train_indices = all_indices[:train_size]
+                # val_indices = all_indices[train_size:]
+                # self.streamline_train, self.streamline_val = \
+                #     (Subset(streamline_train_full, train_indices),
+                #      Subset(streamline_val_full, val_indices))
             else:
 
                 streamline_train_full = StreamlineDataset(

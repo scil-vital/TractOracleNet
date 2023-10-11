@@ -30,6 +30,7 @@ class StreamlineBatchDataset(StreamlineDataset):
 
         hdf_subject = f['streamlines']
         data = hdf_subject['data']
+
         scores_data = hdf_subject['scores']
 
         start, end = indices[0], indices[-1] + 1
