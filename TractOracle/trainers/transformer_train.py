@@ -86,7 +86,7 @@ class TractOracleTransformerTraining():
                           max_epochs=self.max_ep,
                           enable_checkpointing=True,
                           default_root_dir=root_dir,
-                          precision=16)
+                          precision='16-mixed')
 
         trainer.fit(model, dm, ckpt_path=self.checkpoint)
 
@@ -124,9 +124,9 @@ def add_args(parser):
                         help='Validation dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=2**11,
+    parser.add_argument('--batch_size', type=int, default=(2**12+2**10),
                         help='TODO')
-    parser.add_argument('--num_workers', type=int, default=30,
+    parser.add_argument('--num_workers', type=int, default=20,
                         help='TODO')
     parser.add_argument('--checkpoint', type=str,
                         help='TODO')

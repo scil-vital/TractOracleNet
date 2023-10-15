@@ -87,7 +87,7 @@ class TransformerOracle(LightningModule):
             y = y.squeeze(0)
 
         y_hat = self(x)
-        pred_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        pred_loss = self.loss(y_hat, y)
 
         acc_05 = calc_accuracy(y, y_hat)
 
@@ -104,7 +104,7 @@ class TransformerOracle(LightningModule):
             y = y.squeeze(0)
 
         y_hat = self(x)
-        pred_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        pred_loss = self.loss(y_hat, y)
 
         acc_05 = calc_accuracy(y, y_hat)
 

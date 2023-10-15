@@ -17,7 +17,7 @@ class StreamlineDataModule(pl.LightningDataModule):
         val_file: str,
         test_file: str,
         batch_size: int = 1024,
-        num_workers: int = 30,
+        num_workers: int = 20,
         valid_pct=0.2,
         total_pct=1.,
     ):
