@@ -4,10 +4,6 @@ import torch
 from torch import nn, Tensor
 
 
-def calc_accuracy(y, y_hat):
-    return ((y_hat > 0.5).int() == y.int()).float().mean()
-
-
 class PositionalEncoding(nn.Module):
     """ From
     https://pytorch.org/tutorials/beginner/transformer_tutorial.htm://pytorch.org/tutorials/beginner/transformer_tutorial.html  # noqa E504

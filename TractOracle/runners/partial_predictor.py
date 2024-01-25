@@ -8,6 +8,9 @@ from dipy.io.streamline import load_tractogram, save_tractogram
 from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
+from scilpy.utils.streamlines import uniformize_bundle_sft
+from scilpy.viz.utils import get_colormap
+
 from TractOracle.models.autoencoder import AutoencoderOracle
 from TractOracle.models.feed_forward import FeedForwardOracle
 from TractOracle.models.transformer import TransformerOracle
@@ -69,6 +72,7 @@ class TractOraclePredictor():
                               bbox_valid_check=False)
         sft.to_vox()
         sft.to_corner()
+        uniformize_bundle_sft(sft)
 
         lengths = [len(s) for s in sft.streamlines]
         scores_per_point = np.zeros((len(lengths), max(lengths), 1))
@@ -89,8 +93,16 @@ class TractOraclePredictor():
                 pred_batch = model(data).cpu().numpy()
 
             scores_per_point[i][3:] = pred_batch[:, None]
-        sft.data_per_point['score'] = [list(scores_per_point[i, :l])
-                                       for i, l in enumerate(lengths)]
+
+        scores = [list(scores_per_point[i, :l])
+                  for i, l in enumerate(lengths)]
+        sft.data_per_point['score'] = scores
+
+        cmap = get_colormap('jet')
+        color = cmap(np.squeeze(sft.data_per_point['score']._data))[:, 0:3] * 255
+
+        sft.data_per_point['color'] = sft.streamlines
+        sft.data_per_point['color']._data = color
         save_tractogram(sft, self.out, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps

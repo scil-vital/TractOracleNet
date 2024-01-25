@@ -5,6 +5,7 @@ from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.loggers import CometLogger
 from os.path import join
 # from lightning.pytorch.tuner import Tuner
+from lightning.pytorch.callbacks import LearningRateMonitor
 
 from TractOracle.models.transformer import TransformerOracle
 from TractOracle.trainers.data_module import StreamlineDataModule
@@ -80,13 +81,15 @@ class TractOracleTransformerTraining():
             "n_head": self.n_head,
             "batch_size": self.batch_size})
 
+        lr_monitor = LearningRateMonitor(logging_interval='step')
         trainer = Trainer(logger=comet_logger,
                           log_every_n_steps=1,
                           num_sanity_val_steps=0,
                           max_epochs=self.max_ep,
                           enable_checkpointing=True,
                           default_root_dir=root_dir,
-                          precision='16-mixed')
+                          precision='16-mixed',
+                          callbacks=[lr_monitor])
 
         trainer.fit(model, dm, ckpt_path=self.checkpoint)
 
@@ -124,7 +127,7 @@ def add_args(parser):
                         help='Validation dataset.')
     parser.add_argument('test_dataset_file', type=str,
                         help='Testing dataset.')
-    parser.add_argument('--batch_size', type=int, default=(2**12+2**10),
+    parser.add_argument('--batch_size', type=int, default=(2**11+768),
                         help='TODO')
     parser.add_argument('--num_workers', type=int, default=20,
                         help='TODO')

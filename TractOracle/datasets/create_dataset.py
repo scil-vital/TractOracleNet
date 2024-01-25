@@ -3,12 +3,11 @@ import argparse
 
 import h5py
 import json
-import nibabel as nib
 import numpy as np
 
 from argparse import RawTextHelpFormatter
 from glob import glob
-from os.path import join
+from os.path import expanduser
 from tqdm import tqdm
 
 from dipy.io.streamline import load_tractogram
@@ -34,8 +33,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=parse_args.__doc__,
         formatter_class=RawTextHelpFormatter)
-    parser.add_argument('path', type=str,
-                        help='Location of the dataset files.')
     parser.add_argument('config_file', type=str,
                         help="Configuration file to load subjects and their"
                         " volumes.")
@@ -53,14 +50,12 @@ def main():
     """ Parse args, generate dataset and save it on disk """
     args = parse_args()
 
-    generate_dataset(path=args.path,
-                     config_file=args.config_file,
+    generate_dataset(config_file=args.config_file,
                      output=args.output,
                      nb_points=args.nb_points)
 
 
 def generate_dataset(
-    path: str,
     config_file: str,
     output: str,
     nb_points: int,
@@ -85,83 +80,43 @@ def generate_dataset(
         hdf_file.attrs['version'] = 2
         hdf_file.attrs['nb_points'] = nb_points
 
-        with open(join(path, config_file), "r") as conf:
+        with open(config_file, "r") as conf:
             config = json.load(conf)
 
             add_subjects_to_hdf5(
-                path, config, hdf_file, nb_points)
+                config, hdf_file, nb_points)
 
     print("Saved dataset : {}".format(dataset_file))
 
 
 def add_subjects_to_hdf5(
 
-    path, config, hdf_file, nb_points
+    config, hdf_file, nb_points
 ):
     """
 
     Args:
-        path:
         config:
         hdf_file:
         nb_points:
 
     """
-
+    sub_files = []
     for subject_id in config:
         "Processing subject {}".format(subject_id),
 
         subject_config = config[subject_id]
-        add_subject_to_hdf5(path, subject_config, hdf_file, nb_points)
+
+        reference_anat = subject_config['reference']
+        streamlines_files_list = subject_config['streamlines']
+
+        sub_files.append((reference_anat, streamlines_files_list))
+
+    process_subjects(sub_files, hdf_file, nb_points)
 
 
-def add_subject_to_hdf5(
-    path, config, hdf_subject, nb_points,
-):
-    """
-
-    Args:
-        path
-        config:
-        hdf_subject:
-        nb_points:
-
-    """
-
-    reference_anat = config['reference']
-    streamlines_files_list = config['streamlines']
-
-    # Process subject's data
-    process_subject(
-        hdf_subject, path, reference_anat, streamlines_files_list, nb_points)
-
-
-def process_subject(
-    hdf_subject,
-    path: str,
-    reference: str,
-    streamlines_files: str,
-    nb_points: float,
-):
-    """
-
-    Args:
-        hdf_subject:
-        path:
-        reference:
-        bundles:
-        nb_points:
-
-    """
-
-    ref_volume = nib.load(join(path, reference))
-
-    process_all_streamlines(
-        hdf_subject, path, streamlines_files, ref_volume, nb_points)
-
-
-def process_all_streamlines(
-    hdf_subject, path, streamlines_files, reference, nb_points,
+def process_subjects(
+    sub_files, hdf_subject, nb_points,
 ):
     """ Process bundles.
 
@@ -176,30 +131,37 @@ def process_all_streamlines(
     """
     total = 0
     idx = 0
+    max_strml = 500000
     print('Computing size of dataset.')
-    if "*" in streamlines_files[0]:
-        streamlines_files = glob(join(path, streamlines_files[0]))
-    for bundle in tqdm(streamlines_files):
-        total += get_number_of_streamlines(path, bundle, reference)
+    for anat, strm_files in tqdm(sub_files):
+        streamlines_files = glob(expanduser(strm_files[0]))
+        for bundle in streamlines_files:
+            total += min(
+                max_strml, get_number_of_streamlines(
+                    expanduser(bundle), expanduser(anat)))
+
     print('Dataset will have {} streamlines'.format(total))
     print('Writing streamlines to dataset.')
     idices = np.arange(total)
     np.random.shuffle(idices)
-    for bundle in tqdm(streamlines_files):
-        ps = load_streamlines(join(path, bundle), reference)
+    for anat, strm_files in tqdm(sub_files):
+        streamlines_files = glob(expanduser(strm_files[0]))
+        for bundle in streamlines_files:
 
-        len_ps = len(ps)
-        print('Processing {}'.format('/'.join((path, bundle))))
-        idx = idices[:len_ps]
-        process_bundle(
-            ps, hdf_subject, reference, nb_points, total, idx)
-        idices = idices[len_ps:]
+            ps = load_streamlines(bundle, expanduser(anat))
+            ps_idices = np.random.choice(len(ps), max_strml, replace=False)
+            print('Processing {}'.format(bundle))
+            idx = idices[:len(ps_idices)]
+            process_bundle(
+                ps[ps_idices], hdf_subject,
+                expanduser(anat), nb_points, total, idx)
+            idices = idices[len(ps_idices):]
 
 
 def get_number_of_streamlines(
-    path, f, reference
+    f, reference
 ):
-    ps = load_streamlines(join(path, f), reference)
+    ps = load_streamlines(f, reference)
 
     return len(ps)
 

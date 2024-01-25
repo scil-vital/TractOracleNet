@@ -49,20 +49,21 @@ class StreamlineBatchDataset(StreamlineDataset):
             streamlines = data[start:end]
             score = scores_data[start:end]
 
-        streamlines = np.asarray([data[i] for i in indices])
-
-        score = np.asarray([scores_data[i] for i in indices])
+        # streamlines = np.asarray([data[i] for i in indices])
+        # score = np.asarray([scores_data[i] for i in indices])
 
         # Flip streamline for robustness
         if np.random.random() < self.flip_p:
             streamlines = np.flip(streamlines, axis=1).copy()
 
         if self.dense:
-            new_length = np.random.randint(3, streamlines.shape[1])
+            new_lengths = np.random.randint(3, streamlines.shape[1],
+                                            size=streamlines.shape[0])
             if self.partial:
                 old_length = streamlines.shape[1]
-                score *= new_length / old_length
-            array_seq = ArraySequence(streamlines[:, :new_length])
+                score *= new_lengths / old_length
+            array_seq = ArraySequence([streamlines[i, :new_lengths[i]]
+                                       for i in range(len(new_lengths))])
             streamlines = set_number_of_points(array_seq, 128)
             streamlines = np.asarray(streamlines)
 

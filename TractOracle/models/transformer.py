@@ -2,10 +2,13 @@ import math
 import torch
 
 from torch import nn
-from torch.nn import functional as F
 from lightning.pytorch import LightningModule
+from torchmetrics.classification import (
+    BinaryRecall, BinaryPrecision, BinaryAccuracy)
+from torchmetrics.regression import (
+    MeanSquaredError, MeanAbsoluteError)
 
-from TractOracle.models.utils import calc_accuracy, PositionalEncoding
+from TractOracle.models.utils import PositionalEncoding
 
 
 class TransformerOracle(LightningModule):
@@ -46,19 +49,27 @@ class TransformerOracle(LightningModule):
         self.head = nn.Linear(self.embedding_size, output_size)
 
         self.loss = loss()
-
         self.sig = nn.Sigmoid()
+
+        self.accuracy = BinaryAccuracy()
+        self.recall = BinaryRecall()
+        self.precision = BinaryPrecision()
+        self.mse = MeanSquaredError()
+        self.mae = MeanAbsoluteError()
 
         self.save_hyperparameters()
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, patience=2, threshold=0.01, verbose=True)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer=optimizer, T_max=self.trainer.max_epochs
+            )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": scheduler,
-            "monitor": "pred_train_loss"
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+            },
         }
 
     def forward(self, x):
@@ -89,10 +100,18 @@ class TransformerOracle(LightningModule):
         y_hat = self(x)
         pred_loss = self.loss(y_hat, y)
 
-        acc_05 = calc_accuracy(y, y_hat)
+        acc = self.accuracy(y_hat, torch.round(y))
+        recall = self.recall(y_hat, torch.round(y))
+        precision = self.precision(y_hat, torch.round(y))
+        mse = self.mse(y_hat, y)
+        mae = self.mae(y_hat, y)
 
-        self.log('pred_train_loss', pred_loss, on_step=False, on_epoch=True)
-        self.log('pred_train_acc_0.5', acc_05, on_step=False, on_epoch=True)
+        self.log('train_loss', pred_loss, on_step=True, on_epoch=False)
+        self.log('train_acc', acc, on_step=True, on_epoch=False)
+        self.log('train_recall', recall, on_step=True, on_epoch=False)
+        self.log('train_precision', precision, on_step=True, on_epoch=False)
+        self.log('train_mse', mse, on_step=True, on_epoch=False)
+        self.log('train_mae', mae, on_step=True, on_epoch=False)
 
         return pred_loss
 
@@ -106,7 +125,15 @@ class TransformerOracle(LightningModule):
         y_hat = self(x)
         pred_loss = self.loss(y_hat, y)
 
-        acc_05 = calc_accuracy(y, y_hat)
+        acc = self.accuracy(y_hat, torch.round(y))
+        recall = self.recall(y_hat, torch.round(y))
+        precision = self.precision(y_hat, torch.round(y))
+        mse = self.mse(y_hat, y)
+        mae = self.mae(y_hat, y)
 
-        self.log('pred_val_loss', pred_loss, on_step=False, on_epoch=True)
-        self.log('pred_val_acc_0.5', acc_05, on_step=False, on_epoch=True)
+        self.log('val_loss', pred_loss)
+        self.log('val_acc', acc)
+        self.log('val_recall', recall)
+        self.log('val_precision', precision)
+        self.log('val_mse', mse, on_step=True, on_epoch=False)
+        self.log('val_mae', mae, on_step=True, on_epoch=False)

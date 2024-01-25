@@ -7,6 +7,8 @@ from argparse import RawTextHelpFormatter
 from dipy.io.streamline import load_tractogram, save_tractogram
 from dipy.tracking.streamline import set_number_of_points
 
+from scilpy.viz.utils import get_colormap
+
 from TractOracle.models.autoencoder import AutoencoderOracle
 from TractOracle.models.feed_forward import FeedForwardOracle
 from TractOracle.models.transformer import TransformerOracle
@@ -41,7 +43,7 @@ class TractOraclePredictor():
 
         # Get example state to define NN input size
         # 128 points directions -> 127 3D directions
-        self.input_size = (128-1) * 3  # TODO: Get this from datamodule
+        self.input_size = (128-1) * 3  # TODO: Get this from datamodule ?
         self.output_size = 1  # TODO: Get this from datamodule.
         # Might quantize score in the future ?
 
@@ -65,8 +67,7 @@ class TractOraclePredictor():
         # Load the tractogram using a reference to make sure it can
         # go into proper voxel space.
         sft = load_tractogram(self.tractogram, self.reference,
-                              bbox_valid_check=False)
-
+                              bbox_valid_check=False, trk_header_check=False)
         sft.to_vox()
         sft.to_corner()
 
@@ -82,6 +83,7 @@ class TractOraclePredictor():
             j = i + batch_size
             # Load the features as torch tensors and predict
             batch_dirs = dirs[i:j, :, :]
+
             with torch.no_grad():
                 data = torch.as_tensor(
                     batch_dirs, dtype=torch.float, device='cuda')
@@ -89,6 +91,11 @@ class TractOraclePredictor():
                 predictions.extend(pred_batch.cpu().numpy().tolist())
 
         predictions = np.asarray(predictions)
+        cmap = get_colormap('jet')
+        color = cmap(predictions)[:, 0:3] * 255
+        tmp = [np.tile([color[i][0], color[i][1], color[i][2]],
+                       (len(sft.streamlines[i]), 1))
+               for i in range(len(sft.streamlines))]
 
         if not self.all:
             # Fetch the streamlines that passed the gauntlet
@@ -96,6 +103,7 @@ class TractOraclePredictor():
             failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
             filtered = sft[ids]
             filtered.data_per_streamline['score'] = predictions[ids]
+            filtered.data_per_streamline['color'] = tmp[ids]
 
             # Save the filtered streamlines
             print('Kept {}/{} streamlines ({}%).'.format(len(filtered),
@@ -106,11 +114,15 @@ class TractOraclePredictor():
                 failed_sft = sft[failed_ids]
                 failed_sft.data_per_streamline['score'] = \
                     predictions[failed_ids]
+
+                failed_sft.data_per_streamline['color'] = \
+                    predictions[failed_ids]
                 save_tractogram(failed_sft, self.failed,
                                 bbox_valid_check=False)
         else:
             sft.data_per_streamline['score'] = predictions
-            save_tractogram(sft, self.out, bbox_valid_check=False)
+            sft.data_per_point['color'] = tmp
+        save_tractogram(sft, self.out, bbox_valid_check=False)
 
         # TODO: Save all streamlines and add scores as dps
 
