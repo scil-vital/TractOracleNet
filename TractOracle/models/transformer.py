@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 from lightning.pytorch import LightningModule
 from torchmetrics.classification import (
-    BinaryRecall, BinaryPrecision, BinaryAccuracy)
+    BinaryRecall, BinaryPrecision, BinaryAccuracy, BinaryROC)
 from torchmetrics.regression import (
     MeanSquaredError, MeanAbsoluteError)
 
@@ -85,6 +85,7 @@ class TransformerOracle(LightningModule):
         self.precision = BinaryPrecision()
         self.mse = MeanSquaredError()
         self.mae = MeanAbsoluteError()
+        self.roc = BinaryROC()
 
         self.save_hyperparameters()
 
@@ -166,3 +167,30 @@ class TransformerOracle(LightningModule):
         self.log('val_precision', precision)
         self.log('val_mse', mse, on_step=True, on_epoch=False)
         self.log('val_mae', mae, on_step=True, on_epoch=False)
+
+    def test_step(self, test_batch, batch_idx):
+        x, y = test_batch
+
+        if len(x.shape) > 3:
+            x = x.squeeze(0)
+            y = y.squeeze(0)
+
+        y_hat = self(x)
+
+        acc = self.accuracy(y_hat, torch.round(y))
+        recall = self.recall(y_hat, torch.round(y))
+        precision = self.precision(y_hat, torch.round(y))
+        mse = self.mse(y_hat, y)
+        mae = self.mae(y_hat, y)
+        fpr, tpr, thresholds = self.roc(y_hat, y.int())
+
+        self.log('test_acc', acc, on_step=False, on_epoch=True)
+        self.log('test_recall', recall, on_step=False, on_epoch=True)
+        self.log('test_precision', precision, on_step=False, on_epoch=True)
+        self.log('test_mse', mse, on_step=False, on_epoch=True)
+        self.log('test_mae', mae, on_step=False, on_epoch=True)
+        self.log('test_mae', mae, on_step=False, on_epoch=True)
+        for f, p, t in zip(fpr, tpr, thresholds):
+            self.log('test_{}_fpr'.format(t), f, on_step=False, on_epoch=True)
+            self.log('test_{}_tpr'.format(t), t, on_step=False, on_epoch=True)
+        # self.log('test_roc', roc, on_step=False, on_epoch=True)

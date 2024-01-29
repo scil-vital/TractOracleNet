@@ -1,8 +1,7 @@
 import lightning.pytorch as pl
-import numpy as np
 
 from torch.utils.data import (
-    BatchSampler, DataLoader, SequentialSampler, Subset, random_split)
+    BatchSampler, DataLoader, SequentialSampler, random_split)
 
 
 from TractOracle.datasets.StreamlineDataset import StreamlineDataset
@@ -59,16 +58,7 @@ class StreamlineDataModule(pl.LightningDataModule):
 
                 self.streamline_val = StreamlineBatchDataset(
                     self.val_file, dense=False, partial=False)
-                # all_indices = np.arange(len(streamline_train_full))
-                # train_size = int(
-                #     len(streamline_train_full) * (1 - self.valid_pct))
-                # train_indices = all_indices[:train_size]
-                # val_indices = all_indices[train_size:]
-                # self.streamline_train, self.streamline_val = \
-                #     (Subset(streamline_train_full, train_indices),
-                #      Subset(streamline_val_full, val_indices))
             else:
-
                 streamline_train_full = StreamlineDataset(
                     self.train_file)
 
@@ -77,8 +67,9 @@ class StreamlineDataModule(pl.LightningDataModule):
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
-            self.streamline_test = StreamlineDataset(
-                self.test_file)
+            self.streamline_test = StreamlineBatchDataset(
+                self.test_file, dense=False, partial=False,
+                noise=0.0, flip_p=0.0)
 
         if stage == "predict":
             self.streamline_test = StreamlineDataset(
