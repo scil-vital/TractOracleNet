@@ -1,6 +1,7 @@
 import math
 import torch
 
+from matplotlib import pyplot as plt
 from torch import nn, Tensor
 from lightning.pytorch import LightningModule
 from torchmetrics.classification import (
@@ -182,7 +183,7 @@ class TransformerOracle(LightningModule):
         precision = self.precision(y_hat, torch.round(y))
         mse = self.mse(y_hat, y)
         mae = self.mae(y_hat, y)
-        fpr, tpr, thresholds = self.roc(y_hat, y.int())
+        self.roc.update(y_hat, y.int())
 
         self.log('test_acc', acc, on_step=False, on_epoch=True)
         self.log('test_recall', recall, on_step=False, on_epoch=True)
@@ -190,7 +191,10 @@ class TransformerOracle(LightningModule):
         self.log('test_mse', mse, on_step=False, on_epoch=True)
         self.log('test_mae', mae, on_step=False, on_epoch=True)
         self.log('test_mae', mae, on_step=False, on_epoch=True)
-        for f, p, t in zip(fpr, tpr, thresholds):
-            self.log('test_{}_fpr'.format(t), f, on_step=False, on_epoch=True)
-            self.log('test_{}_tpr'.format(t), t, on_step=False, on_epoch=True)
-        # self.log('test_roc', roc, on_step=False, on_epoch=True)
+
+    def test_epoch_end(self, outputs):
+
+        fig, ax_ = self.roc.plot(score=True)
+
+        fig.savefig('roc.png')
+        plt.close(fig)
