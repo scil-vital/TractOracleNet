@@ -139,7 +139,7 @@ rich==13.3.5
 rsa==4.9
 s3fs==2022.11.0
 scikit-learn==1.2.2
-scilpy @ git+https://github.com/scilus/scilpy@76338caa7fae44870ad64b9167e50dbe9a85e625
+scilpy @ git+https://github.com/scilus/scilpy@1.5.0
 scipy==1.9.3
 scs==3.2.3
 six==1.16.0

@@ -1,35 +1,28 @@
-import math
 import torch
 
-from torch import nn, Tensor
+from TractOracle.models.autoencoder import AutoencoderOracle
+from TractOracle.models.feed_forward import FeedForwardOracle
+from TractOracle.models.transformer import TransformerOracle
 
 
-class PositionalEncoding(nn.Module):
-    """ From
-    https://pytorch.org/tutorials/beginner/transformer_tutorial.htm://pytorch.org/tutorials/beginner/transformer_tutorial.html  # noqa E504
-    """
+def get_model(checkpoint_file):
+    """ Get the model from a checkpoint. """
 
-    def __init__(
-        self, d_model: int, dropout: float = 0.1, max_len: int = 5000
-    ):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
+    # Load the model's hyper and actual params from a saved checkpoint
+    checkpoint = torch.load(checkpoint_file)
 
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, 1, d_model)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe)
+    # The model's class is saved in hparams
+    models = {
+        'AutoencoderOracle': AutoencoderOracle,
+        'FeedForwardOracle': FeedForwardOracle,
+        'TransformerOracle': TransformerOracle
+    }
 
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Arguments:
-            x: Tensor, shape ``[seq_len, batch_size, embedding_dim]``
-        """
-        x = x.permute(1, 0, 2)
-        x = x + self.pe[:x.size(0)]
-        x = self.dropout(x)
-        x = x.permute(1, 0, 2)
-        return x
+    hyper_parameters = checkpoint["hyper_parameters"]
+    # Load it from the checkpoint
+    model = models[hyper_parameters[
+        'name']].load_from_checkpoint(checkpoint_file)
+    # Put the model in eval mode to fix dropout and other stuff
+    model.eval()
+
+    return model

@@ -11,9 +11,8 @@ from tqdm import tqdm
 from scilpy.utils.streamlines import uniformize_bundle_sft
 from scilpy.viz.utils import get_colormap
 
-from TractOracle.models.autoencoder import AutoencoderOracle
-from TractOracle.models.feed_forward import FeedForwardOracle
-from TractOracle.models.transformer import TransformerOracle
+from TractOracle.utils import save_filtered_streamlines
+from TractOracle.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -38,41 +37,20 @@ class TractOraclePredictor():
         self.failed = train_dto['failed']
         self.all = train_dto['all']
 
-    def run(self):
+    def predict(self, model, sft):
+        """ Predict the scores of the streamlines point by point.
+
+        Args:
+            model: The model to use for prediction.
+            data: The data to predict on.
+
+        Returns:
+            scores: The scores of the streamlines.
+
         """
-        Main method where the magic happens
-        """
 
-        # Get example state to define NN input size
-        # 128 points directions -> 127 3D directions
-        self.input_size = (128-1) * 3  # TODO: Get this from datamodule
-        self.output_size = 1  # TODO: Get this from datamodule.
-        # Might quantize score in the future ?
-
-        # Load the model's hyper and actual params from a saved checkpoint
-        checkpoint = torch.load(self.checkpoint)
-        hyper_parameters = checkpoint["hyper_parameters"]
-
-        # The model's class is saved in hparams
-        models = {
-            'AutoencoderOracle': AutoencoderOracle,
-            'FeedForwardOracle': FeedForwardOracle,
-            'TransformerOracle': TransformerOracle
-        }
-
-        # Load it from the checkpoint
-        model = models[hyper_parameters[
-            'name']].load_from_checkpoint(self.checkpoint)
-        # Put the model in eval mode to fix dropout and other stuff
-        model.eval()
-
-        # Load the tractogram using a reference to make sure it can
-        # go into proper voxel space.
-        sft = load_tractogram(self.tractogram, self.reference,
-                              bbox_valid_check=False)
         sft.to_vox()
         sft.to_corner()
-        uniformize_bundle_sft(sft)
 
         lengths = [len(s) for s in sft.streamlines]
         scores_per_point = np.zeros((len(lengths), max(lengths), 1))
@@ -96,6 +74,29 @@ class TractOraclePredictor():
 
         scores = [list(scores_per_point[i, :l])
                   for i, l in enumerate(lengths)]
+
+        return scores
+
+    def run(self):
+        """
+        Main method where the magic happens
+        """
+
+        # Load the model's hyper and actual params from a saved checkpoint
+        checkpoint = torch.load(self.checkpoint)
+
+        model = get_model(checkpoint)
+
+        # Load the tractogram using a reference to make sure it can
+        # go into proper voxel space.
+        sft = load_tractogram(self.tractogram, self.reference,
+                              bbox_valid_check=False, trk_header_check=False)
+
+        uniformize_bundle_sft(sft)
+
+        # Predict the scores of the streamlines
+        scores = self.predict(model, sft)
+
         sft.data_per_point['score'] = scores
 
         cmap = get_colormap('jet')
