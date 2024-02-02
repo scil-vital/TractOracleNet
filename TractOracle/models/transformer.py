@@ -5,7 +5,8 @@ from matplotlib import pyplot as plt
 from torch import nn, Tensor
 from lightning.pytorch import LightningModule
 from torchmetrics.classification import (
-    BinaryRecall, BinaryPrecision, BinaryAccuracy, BinaryROC)
+    BinaryRecall, BinaryPrecision, BinaryAccuracy, BinaryROC, BinarySpecificity,
+    BinaryF1Score)
 from torchmetrics.regression import (
     MeanSquaredError, MeanAbsoluteError)
 
@@ -78,15 +79,22 @@ class TransformerOracle(LightningModule):
         self.bert = nn.TransformerEncoder(layer, self.n_layers)
         self.head = nn.Linear(self.embedding_size, output_size)
 
-        self.loss = loss()
+        if loss == nn.BCEWithLogitsLoss:
+            pos = torch.zeros((1)) + 10
+            self.loss = loss(pos_weight=pos)
+        else:
+            self.loss = loss()
+
         self.sig = nn.Sigmoid()
 
         self.accuracy = BinaryAccuracy()
         self.recall = BinaryRecall()
+        self.spec = BinarySpecificity()
         self.precision = BinaryPrecision()
         self.mse = MeanSquaredError()
         self.mae = MeanAbsoluteError()
         self.roc = BinaryROC()
+        self.f1 = BinaryF1Score()
 
         self.save_hyperparameters()
 
@@ -118,6 +126,8 @@ class TransformerOracle(LightningModule):
 
         if self.loss is not nn.BCEWithLogitsLoss:
             y = self.sig(y)
+        else:
+            y = hidden[:, 0]
 
         return y.squeeze(-1)
 
@@ -133,6 +143,7 @@ class TransformerOracle(LightningModule):
 
         acc = self.accuracy(y_hat, torch.round(y))
         recall = self.recall(y_hat, torch.round(y))
+        spec = self.spec(y_hat, torch.round(y))
         precision = self.precision(y_hat, torch.round(y))
         mse = self.mse(y_hat, y)
         mae = self.mae(y_hat, y)
@@ -140,6 +151,7 @@ class TransformerOracle(LightningModule):
         self.log('train_loss', pred_loss, on_step=True, on_epoch=False)
         self.log('train_acc', acc, on_step=True, on_epoch=False)
         self.log('train_recall', recall, on_step=True, on_epoch=False)
+        self.log('train_spec', spec, on_step=True, on_epoch=False)
         self.log('train_precision', precision, on_step=True, on_epoch=False)
         self.log('train_mse', mse, on_step=True, on_epoch=False)
         self.log('train_mae', mae, on_step=True, on_epoch=False)
@@ -159,15 +171,19 @@ class TransformerOracle(LightningModule):
         acc = self.accuracy(y_hat, torch.round(y))
         recall = self.recall(y_hat, torch.round(y))
         precision = self.precision(y_hat, torch.round(y))
+        spec = self.spec(y_hat, torch.round(y))
         mse = self.mse(y_hat, y)
         mae = self.mae(y_hat, y)
+        f1 = self.f1(y_hat, y)
 
-        self.log('val_loss', pred_loss)
-        self.log('val_acc', acc)
-        self.log('val_recall', recall)
-        self.log('val_precision', precision)
-        self.log('val_mse', mse, on_step=True, on_epoch=False)
-        self.log('val_mae', mae, on_step=True, on_epoch=False)
+        self.log('val_loss', pred_loss, on_step=False, on_epoch=True)
+        self.log('val_acc', acc, on_step=False, on_epoch=True)
+        self.log('val_recall', recall, on_step=False, on_epoch=True)
+        self.log('val_spec', spec, on_step=False, on_epoch=True)
+        self.log('val_precision', precision, on_step=False, on_epoch=True)
+        self.log('val_mse', mse, on_step=False, on_epoch=True)
+        self.log('val_mae', mae, on_step=False, on_epoch=True)
+        self.log('val_f1', f1, on_step=False, on_epoch=True)
 
     def test_step(self, test_batch, batch_idx):
         x, y = test_batch
@@ -181,18 +197,21 @@ class TransformerOracle(LightningModule):
         acc = self.accuracy(y_hat, torch.round(y))
         recall = self.recall(y_hat, torch.round(y))
         precision = self.precision(y_hat, torch.round(y))
+        spec = self.spec(y_hat, y)
         mse = self.mse(y_hat, y)
         mae = self.mae(y_hat, y)
+        f1 = self.f1(y_hat, y)
         self.roc.update(y_hat, y.int())
 
         self.log('test_acc', acc, on_step=False, on_epoch=True)
         self.log('test_recall', recall, on_step=False, on_epoch=True)
         self.log('test_precision', precision, on_step=False, on_epoch=True)
+        self.log('test_spec', spec, on_step=False, on_epoch=True)
         self.log('test_mse', mse, on_step=False, on_epoch=True)
         self.log('test_mae', mae, on_step=False, on_epoch=True)
-        self.log('test_mae', mae, on_step=False, on_epoch=True)
+        self.log('test_f1', f1, on_step=False, on_epoch=True)
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
 
         fig, ax_ = self.roc.plot(score=True)
 

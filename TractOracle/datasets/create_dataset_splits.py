@@ -6,9 +6,7 @@ import json
 import numpy as np
 
 from argparse import RawTextHelpFormatter
-from glob import glob
 from os.path import expanduser
-from tqdm import tqdm
 
 from dipy.io.streamline import load_tractogram
 from dipy.tracking.streamline import set_number_of_points
@@ -71,27 +69,16 @@ def generate_dataset(
 
     dataset_name = output
 
-    # Clean existing processed files
-    dataset_file = "{}.hdf5".format(dataset_name)
+    with open(config_file, "r") as conf:
+        config = json.load(conf)
 
-    # Initialize database
-    with h5py.File(dataset_file, 'w') as hdf_file:
-        # Save version
-        hdf_file.attrs['version'] = 2
-        hdf_file.attrs['nb_points'] = nb_points
-
-        with open(config_file, "r") as conf:
-            config = json.load(conf)
-
-            add_subjects_to_hdf5(
-                config, hdf_file, nb_points)
-
-    print("Saved dataset : {}".format(dataset_file))
+        add_subjects_to_hdf5(
+            config, dataset_name, nb_points)
 
 
 def add_subjects_to_hdf5(
 
-    config, hdf_file, nb_points
+    config, dataset_name, nb_points
 ):
     """
 
@@ -101,22 +88,20 @@ def add_subjects_to_hdf5(
         nb_points:
 
     """
-    sub_files = []
     for subject_id in config:
         "Processing subject {}".format(subject_id),
 
         subject_config = config[subject_id]
 
-        reference_anat = subject_config['reference']
-        streamlines_files_list = subject_config['streamlines']
+        reference_file = subject_config['reference']
+        streamlines_file = subject_config['streamlines']
 
-        sub_files.append((reference_anat, streamlines_files_list))
-
-    process_subjects(sub_files, hdf_file, nb_points)
+        process_subjects(streamlines_file, reference_file, dataset_name,
+                         nb_points)
 
 
 def process_subjects(
-    sub_files, hdf_subject, nb_points,
+    streamlines_file, reference_file, dataset_name, nb_points,
 ):
     """ Process bundles.
 
@@ -129,34 +114,69 @@ def process_subjects(
         sfts, scores
 
     """
-    total = 0
-    idx = 0
-    max_strml = 500000
     print('Computing size of dataset.')
-    for anat, strm_files in tqdm(sub_files):
-        streamlines_files = glob(expanduser(strm_files[0]))
-        for bundle in streamlines_files:
-            total += min(
-                max_strml, get_number_of_streamlines(
-                    expanduser(bundle), expanduser(anat)))
+    nb = get_number_of_streamlines(
+            expanduser(streamlines_file), expanduser(reference_file))
+    print('Datasets will have {} streamlines'.format(nb))
+    print('Writing streamlines to datasets.')
 
-    print('Dataset will have {} streamlines'.format(total))
-    print('Writing streamlines to dataset.')
-    idices = np.arange(total)
+    idices = np.arange(nb)
     np.random.shuffle(idices)
-    for anat, strm_files in tqdm(sub_files):
-        streamlines_files = glob(expanduser(strm_files[0]))
-        for bundle in streamlines_files:
 
-            ps = load_streamlines(bundle, expanduser(anat))
-            ps_idices = np.random.choice(len(ps), min(max_strml, len(ps)),
-                                         replace=False)
-            print('Processing {}'.format(bundle))
-            idx = idices[:len(ps_idices)]
-            process_bundle(
-                ps[ps_idices], hdf_subject,
-                expanduser(anat), nb_points, total, idx)
-            idices = idices[len(ps_idices):]
+    train_sep = int(nb * 0.70)
+    valid_sep = int((nb - train_sep) * 0.66)
+    train_idices, rem_idices = idices[:train_sep], idices[train_sep:]
+    valid_idices, test_idices = rem_idices[:valid_sep], rem_idices[valid_sep:]
+
+    # Clean existing processed files
+    train_dataset_file = "{}_train.hdf5".format(dataset_name)
+
+    # Initialize database
+    with h5py.File(train_dataset_file, 'w') as hdf_file:
+        # Save version
+        hdf_file.attrs['version'] = 2
+        hdf_file.attrs['nb_points'] = nb_points
+
+        ps = load_streamlines(streamlines_file, 'same')
+        print('Mean score', np.mean(
+            ps[train_idices].data_per_streamline['score']))
+        process_bundle(
+            ps[train_idices], hdf_file,
+            'same', nb_points)
+
+    print("Saved dataset : {}".format(train_dataset_file))
+
+    valid_dataset_file = "{}_valid.hdf5".format(dataset_name)
+    # Initialize database
+    with h5py.File(valid_dataset_file, 'w') as hdf_file:
+        # Save version
+        hdf_file.attrs['version'] = 2
+        hdf_file.attrs['nb_points'] = nb_points
+
+        ps = load_streamlines(streamlines_file, 'same')
+        print('Mean score', np.mean(
+            ps[valid_idices].data_per_streamline['score']))
+        process_bundle(
+            ps[valid_idices], hdf_file,
+            'same', nb_points)
+
+    print("Saved dataset : {}".format(valid_dataset_file))
+
+    test_dataset_file = "{}_test.hdf5".format(dataset_name)
+    # Initialize database
+    with h5py.File(test_dataset_file, 'w') as hdf_file:
+        # Save version
+        hdf_file.attrs['version'] = 2
+        hdf_file.attrs['nb_points'] = nb_points
+
+        ps = load_streamlines(streamlines_file, 'same')
+        print('Mean score', np.mean(
+            ps[test_idices].data_per_streamline['score']))
+        process_bundle(
+            ps[test_idices], hdf_file,
+            'same', nb_points)
+
+    print("Saved dataset : {}".format(test_dataset_file))
 
 
 def get_number_of_streamlines(
@@ -168,9 +188,9 @@ def get_number_of_streamlines(
 
 
 def process_bundle(
-    ps, hdf_subject, reference, nb_points, total, idx
+    ps, hdf_subject, reference, nb_points
 ):
-    add_streamlines_to_hdf5(hdf_subject, ps, nb_points, total, idx)
+    add_streamlines_to_hdf5(hdf_subject, ps, nb_points)
 
 
 def load_streamlines(
@@ -190,14 +210,14 @@ def load_streamlines(
 
     """
 
-    sft = load_tractogram(streamlines_file, reference, bbox_valid_check=False)
+    sft = load_tractogram(expanduser(streamlines_file), 'same', bbox_valid_check=False)
     sft.to_corner()
     sft.to_vox()
 
     return sft
 
 
-def add_streamlines_to_hdf5(hdf_subject, sft, nb_points, total, idx):
+def add_streamlines_to_hdf5(hdf_subject, sft, nb_points):
     """
     Add streamlines to HDF5
 
@@ -209,6 +229,8 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points, total, idx):
         scores:
 
     """
+
+    total = len(sft)
 
     if 'streamlines' not in hdf_subject:
 
@@ -240,10 +262,10 @@ def add_streamlines_to_hdf5(hdf_subject, sft, nb_points, total, idx):
         streamlines_group.create_dataset(
             'scores', shape=(total))
 
-    append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx)
+    append_streamlines_to_hdf5(hdf_subject, sft, nb_points)
 
 
-def append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx):
+def append_streamlines_to_hdf5(hdf_subject, sft, nb_points):
     streamlines_group = hdf_subject['streamlines']
     data_group = streamlines_group['data']
     # offsets_group = streamlines_group['offsets']
@@ -257,9 +279,8 @@ def append_streamlines_to_hdf5(hdf_subject, sft, nb_points, idx):
     assert streamlines.shape[0] == scores.shape[0], \
         (streamlines.shape, scores.shape)
 
-    for i, st, sc in zip(idx, streamlines, scores):
-        data_group[i] = st
-        scores_group[i] = sc
+    data_group[:] = streamlines
+    scores_group[:] = scores
 
 
 if __name__ == "__main__":

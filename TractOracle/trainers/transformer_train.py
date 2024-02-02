@@ -92,7 +92,7 @@ class TractOracleTransformerTraining():
                           callbacks=[lr_monitor])
 
         trainer.fit(model, dm, ckpt_path=self.checkpoint)
-        trainer.test(model, dm, ckpt_path=self.checkpoint)
+        trainer.test(model, dm)
 
     def run(self):
         """
