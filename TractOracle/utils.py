@@ -22,6 +22,23 @@ def get_data(sft):
 
 
 def save_filtered_streamlines(sft, scores, out_tractogram, dense=False):
+    """ Save the filtered streamlines with the scores as colors.
+
+    Parameters
+    ----------
+    sft : StatefulTractogram
+        The input tractogram.
+    scores : array
+        The scores for each streamline.
+    out_tractogram : str
+        The output tractogram.
+    dense : bool, optional
+        If True, the scores are dense and will be used as is.
+        If False, the scores are per streamline and will be repeated for each
+        point of the streamline.
+
+    """
+
     cmap = get_colormap('jet')
 
     if dense:
