@@ -11,7 +11,6 @@ from tqdm import tqdm
 from scilpy.utils.streamlines import uniformize_bundle_sft
 from scilpy.viz.utils import get_colormap
 
-from TractOracle.utils import save_filtered_streamlines
 from TractOracle.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,10 +81,7 @@ class TractOraclePredictor():
         Main method where the magic happens
         """
 
-        # Load the model's hyper and actual params from a saved checkpoint
-        checkpoint = torch.load(self.checkpoint)
-
-        model = get_model(checkpoint)
+        model = get_model(self.checkpoint)
 
         # Load the tractogram using a reference to make sure it can
         # go into proper voxel space.
@@ -105,8 +101,6 @@ class TractOraclePredictor():
         sft.data_per_point['color'] = sft.streamlines
         sft.data_per_point['color']._data = color
         save_tractogram(sft, self.out, bbox_valid_check=False)
-
-        # TODO: Save all streamlines and add scores as dps
 
 
 def add_args(parser):

@@ -5,6 +5,7 @@ import torch
 
 from argparse import RawTextHelpFormatter
 from dipy.io.streamline import load_tractogram
+from dipy.io.stateful_tractogram import StatefulTractogram
 from tqdm import tqdm
 
 from TractOracle.utils import get_data, save_filtered_streamlines
@@ -30,7 +31,7 @@ class TractOraclePredictor():
         self.threshold = train_dto['threshold']
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
-        self.failed = train_dto['failed']
+        self.rejected = train_dto['rejected']
         self.all = train_dto['all']
 
     def predict(self, model, data):
@@ -83,24 +84,34 @@ class TractOraclePredictor():
             ids = np.argwhere(
                 predictions > self.threshold).squeeze()
 
+            new_sft = StatefulTractogram.from_sft(sft[ids].streamlines, sft)
+
             # Save the filtered streamlines
             print('Kept {}/{} streamlines ({}%).'.format(len(ids),
                   len(sft), (len(ids) / len(sft) * 100)))
 
             # Save the streamlines
-            save_filtered_streamlines(sft, predictions, ids, self.out)
+            save_filtered_streamlines(new_sft, predictions[ids], self.out)
 
-            # Save the streamlines that failed
-            if self.failed:
-                # Fetch the streamlines that failed
-                failed_ids = np.setdiff1d(np.arange(predictions.shape[0]), ids)
+            # Save the streamlines that rejected
+            if self.rejected:
+                # Fetch the streamlines that rejected
+                rejected_ids = np.setdiff1d(np.arange(predictions.shape[0]),
+                                            ids)
+
+                new_sft = StatefulTractogram(
+                    sft[rejected_ids], sft.affine, sft.space)
+
                 # Save the streamlines
                 save_filtered_streamlines(
-                    sft, predictions, failed_ids, self.failed)
+                    sft, predictions[rejected_ids], self.rejected)
         else:
             # Save all the streamlines
+
+            sft.data_per_streamline['score'] = predictions
+
             save_filtered_streamlines(
-                sft, predictions, np.arange(0, predictions.shape[0]), self.out)
+                sft, predictions, self.out)
 
 
 def add_args(parser):
@@ -122,7 +133,7 @@ def add_args(parser):
     g.add_argument('--all', action='store_true',
                    help='Output a tractogram containing all streamlines '
                    'and scores.')
-    g.add_argument('--failed', type=str, default=None,
+    g.add_argument('--rejected', type=str, default=None,
                    help='Output file for invalid streamlines.')
 
 

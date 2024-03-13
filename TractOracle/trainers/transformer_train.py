@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import torch
 from argparse import RawTextHelpFormatter
 from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.loggers import CometLogger
@@ -9,6 +10,8 @@ from lightning.pytorch.callbacks import LearningRateMonitor
 
 from TractOracle.models.transformer import TransformerOracle
 from TractOracle.trainers.data_module import StreamlineDataModule
+
+torch.set_float32_matmul_precision("medium")
 
 
 class TractOracleTransformerTraining():

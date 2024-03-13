@@ -13,18 +13,8 @@ from tqdm import tqdm
 from dipy.io.streamline import load_tractogram
 from dipy.tracking.streamline import set_number_of_points
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = 'cpu'  # much faster on cpu #TODO?
-
 """
 Script to process multiple subjects into a single .hdf5 file.
-See example configuration file.
-
-Streamlines will be "pre-reversed" to prevent having to do it on the fly.
-TODO?: Pre-compute states ?
-
-Heavly inspired by https://github.com/scil-vital/dwi_ml/blob/master/dwi_ml/data/hdf5/hdf5_creation.py # noqa E405
-But modified to suit my needs
 """
 
 
@@ -77,7 +67,7 @@ def generate_dataset(
     # Initialize database
     with h5py.File(dataset_file, 'w') as hdf_file:
         # Save version
-        hdf_file.attrs['version'] = 2
+        hdf_file.attrs['version'] = 1
         hdf_file.attrs['nb_points'] = nb_points
 
         with open(config_file, "r") as conf:

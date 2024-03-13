@@ -19,10 +19,8 @@ Script to process multiple subjects into a single .hdf5 file.
 See example configuration file.
 
 Streamlines will be "pre-reversed" to prevent having to do it on the fly.
-TODO?: Pre-compute states ?
 
 Heavly inspired by https://github.com/scil-vital/dwi_ml/blob/master/dwi_ml/data/hdf5/hdf5_creation.py # noqa E405
-But modified to suit my needs
 """
 
 
