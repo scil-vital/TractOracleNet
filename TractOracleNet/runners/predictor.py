@@ -13,6 +13,7 @@ from TractOracleNet.utils import get_data, save_filtered_streamlines
 from TractOracleNet.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+cast_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class TractOracleNetPredictor():
@@ -55,10 +56,10 @@ class TractOracleNetPredictor():
             j = i + self.batch_size
             # Load the features as torch tensors and predict
             batch_dirs = get_data(sft[i:j])
-            with torch.cuda.amp.autocast():
+            with torch.autocast(cast_device):
                 with torch.no_grad():
                     batch = torch.as_tensor(
-                        batch_dirs, dtype=torch.float, device='cuda')
+                        batch_dirs, dtype=torch.float, device=device)
                     pred_batch = model(batch)
                     predictions.extend(pred_batch.cpu().numpy().tolist())
 
@@ -97,10 +98,11 @@ class TractOracleNetPredictor():
             # Compute streamline features as the directions between points
             dirs = np.diff(resampled_streamlines, axis=1)
 
-            with torch.no_grad():
-                data = torch.as_tensor(
-                    dirs, dtype=torch.float, device='cuda')
-                pred_batch = model(data).cpu().numpy()
+            with torch.autocast(cast_device):
+                with torch.no_grad():
+                    data = torch.as_tensor(
+                        dirs, dtype=torch.float, device=device)
+                    pred_batch = model(data).cpu().numpy()
 
             scores_per_point[i][3:] = pred_batch[:, None]
 
