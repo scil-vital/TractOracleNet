@@ -4,11 +4,13 @@ import numpy as np
 import torch
 
 from argparse import RawTextHelpFormatter
-from dipy.io.streamline import load_tractogram, save_tractogram
+from dipy.io.streamline import load_tractogram
+from dipy.io.stateful_tractogram import StatefulTractogram
 from dipy.tracking.streamline import set_number_of_points
+from tqdm import tqdm
 
-from TractOracle.models.autoencoder import AutoencoderOracle
-from TractOracle.models.feed_forward import FeedForwardOracle
+from TractOracle.utils import get_data, save_filtered_streamlines
+from TractOracle.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,88 +26,169 @@ class TractOraclePredictor():
     ):
         """
         """
-        self.experiment_path = train_dto['path']
-        self.experiment = train_dto['experiment']
-        self.id = train_dto['id']
         self.checkpoint = train_dto['checkpoint']
+        self.dense = train_dto['dense']
         self.tractogram = train_dto['tractogram']
         self.reference = train_dto['reference']
         self.threshold = train_dto['threshold']
+        self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
+        self.rejected = train_dto['rejected']
+        self.all = train_dto['all']
+
+    def predict(self, model, sft):
+        """ Predict the scores of the streamlines.
+
+        Args:
+            model: The model to use for prediction.
+            data: The data to predict on.
+
+        Returns:
+            The scores of the streamlines.
+        """
+
+        # Get the directions between points of the streamlines
+        total = len(sft)
+
+        predictions = []
+        for i in tqdm(range(0, total, self.batch_size)):
+            j = i + self.batch_size
+            # Load the features as torch tensors and predict
+            batch_dirs = get_data(sft[i:j])
+            with torch.cuda.amp.autocast():
+                with torch.no_grad():
+                    batch = torch.as_tensor(
+                        batch_dirs, dtype=torch.float, device='cuda')
+                    pred_batch = model(batch)
+                    predictions.extend(pred_batch.cpu().numpy().tolist())
+
+        predictions = np.asarray(predictions)
+
+        return predictions
+
+    def dense_predict(self, model, sft):
+        """ Predict the scores of the streamlines point by point. This will
+        be slower than predict, but is useful for visualizing the scores.
+
+        Args:
+            model: The model to use for prediction.
+            data: The data to predict on.
+
+        Returns:
+            scores: The scores of the streamlines.
+
+        """
+
+        sft.to_vox()
+        sft.to_corner()
+
+        lengths = [len(s) for s in sft.streamlines]
+        scores_per_point = np.zeros((len(lengths), max(lengths), 1))
+
+        # Predict the scores of the streamlines point by point, one streamlne
+        # at a time.
+        for i, s in enumerate(tqdm(sft.streamlines)):
+            length = len(scores_per_point[i])
+            streamlines = [s[:le] for le in range(3, length)]
+
+            # Resample streamlines to a fixed number of points. This should be
+            # set by the model ? TODO?
+            resampled_streamlines = set_number_of_points(streamlines, 128)
+            # Compute streamline features as the directions between points
+            dirs = np.diff(resampled_streamlines, axis=1)
+
+            with torch.no_grad():
+                data = torch.as_tensor(
+                    dirs, dtype=torch.float, device='cuda')
+                pred_batch = model(data).cpu().numpy()
+
+            scores_per_point[i][3:] = pred_batch[:, None]
+
+        scores = [list(scores_per_point[i, :l])
+                  for i, l in enumerate(lengths)]
+
+        return scores
 
     def run(self):
         """
         Main method where the magic happens
         """
 
-        # Get example state to define NN input size
-        # 128 points directions -> 127 3D directions
-        self.input_size = (128-1) * 3  # TODO: Get this from datamodule
-        self.output_size = 1  # TODO: Get this from datamodule.
-        # Might quantize score in the future ?
-
-        # Load the model's hyper and actual params from a saved checkpoint
-        checkpoint = torch.load(self.checkpoint)
-        hyper_parameters = checkpoint["hyper_parameters"]
-
-        # The model's class is saved in hparams
-        models = {
-            'AutoencoderOracle': AutoencoderOracle,
-            'FeedForwardOracle': FeedForwardOracle
-        }
-
-        # Load it from the checkpoint
-        model = models[hyper_parameters[
-            'name']].load_from_checkpoint(self.checkpoint)
-        # Put the model in eval mode to fix dropout and other stuff
-        model.eval()
+        model = get_model(self.checkpoint)
 
         # Load the tractogram using a reference to make sure it can
         # go into proper voxel space.
-        sft = load_tractogram(self.tractogram, self.reference)
-        sft.to_vox()
+        sft = load_tractogram(self.tractogram, self.reference,
+                              bbox_valid_check=False, trk_header_check=False)
 
-        # Resample streamlines to a fixed number of points. This should be
-        # set by the model ? TODO?
-        resampled_streamlines = set_number_of_points(sft.streamlines, 128)
-        # Compute streamline features as the directions between points
-        dirs = np.diff(resampled_streamlines, axis=1)
-
-        # Load the features as torch tensors and predict
-        with torch.no_grad():
-            data = torch.as_tensor(dirs, dtype=torch.float, device='cuda')
-            predictions = model(data).cpu().numpy()
-
-        # Fetch the streamlines that passed the gauntlet
-        ids = np.argwhere(predictions > self.threshold).squeeze()
-        filtered = sft[ids]
+        if self.dense:
+            # Predict the scores of the streamlines point by point
+            predictions = self.dense_predict(model, sft)
+        else:
+            # Predict the scores of the streamlines
+            predictions = self.predict(model, sft)
 
         # Save the filtered streamlines
-        print('Kept {}/{} streamlines.'.format(len(sft), len(filtered)))
-        save_tractogram(filtered, self.out, bbox_valid_check=False)
+        if not self.all and not self.dense:
+            # Fetch the streamlines that passed the gauntlet
+            ids = np.argwhere(
+                predictions > self.threshold).squeeze()
 
-        # TODO: Save all streamlines and add scores as dps
+            new_sft = StatefulTractogram.from_sft(sft[ids].streamlines, sft)
+
+            # Save the filtered streamlines
+            print('Kept {}/{} streamlines ({}%).'.format(len(ids),
+                  len(sft), (len(ids) / len(sft) * 100)))
+
+            # Save the streamlines
+            save_filtered_streamlines(new_sft, predictions[ids], self.out)
+
+            # Save the streamlines that rejected
+            if self.rejected:
+                # Fetch the streamlines that rejected
+                rejected_ids = np.setdiff1d(np.arange(predictions.shape[0]),
+                                            ids)
+
+                new_sft = StatefulTractogram(
+                    sft[rejected_ids], sft.affine, sft.space)
+
+                # Save the streamlines
+                save_filtered_streamlines(
+                    sft, predictions[rejected_ids], self.rejected)
+        else:
+            # Save all the streamlines
+            sft.data_per_point['score'] = predictions
+
+            save_filtered_streamlines(
+                sft, predictions, self.out, dense=self.dense)
 
 
 def add_args(parser):
-    parser.add_argument('path', type=str,
-                        help='Path to experiment')
-    parser.add_argument('experiment',
-                        help='Name of experiment.')
-    parser.add_argument('id', type=str,
-                        help='ID of experiment.')
-    parser.add_argument('checkpoint', type=str,
-                        help='Checkpoint (.ckpt) containing hyperparameters '
-                             'and weights of model.')
     parser.add_argument('tractogram', type=str,
                         help='Tractogram file to score.')
-    parser.add_argument('reference', type=str, default='same',
-                        help='Reference file for tractogram (.nii.gz).'
-                             'For .trk, can be \'same\'.')
     parser.add_argument('out', type=str,
                         help='Output file.')
+    parser.add_argument('--reference', type=str, default='same',
+                        help='Reference file for tractogram (.nii.gz).'
+                             'For .trk, can be \'same\'.')
+    parser.add_argument('--batch_size', type=int, default=512,
+                        help='Batch size for predictions.')
     parser.add_argument('--threshold', type=float, default=0.5,
                         help='Threshold score for filtering.')
+    parser.add_argument('--checkpoint', type=str,
+                        default='model/tractoracle.ckpt',
+                        help='Checkpoint (.ckpt) containing hyperparameters '
+                             'and weights of model.')
+
+    g = parser.add_mutually_exclusive_group()
+    g.add_argument('--all', action='store_true',
+                   help='Output a tractogram containing all streamlines '
+                   'and scores.')
+    g.add_argument('--rejected', type=str, default=None,
+                   help='Output file for invalid streamlines.')
+    g.add_argument('--dense', action='store_true',
+                   help='Predict the scores of the streamlines point by point.'
+                   )
 
 
 def parse_args():
