@@ -9,15 +9,15 @@ from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 
-from TractOracle.models.transformer import TransformerOracle
-from TractOracle.trainers.data_module import StreamlineDataModule
+from TractOracleNet.models.transformer import TransformerOracle
+from TractOracleNet.trainers.data_module import StreamlineDataModule
 
 # Set the default precision to float32 to
 # speed up training and reduce memory usage
 torch.set_float32_matmul_precision("medium")
 
 
-class TractOracleTransformerTraining():
+class TractOracleNetTransformerTraining():
     """ Train a Transformer model to score streamlines.
     """
 
@@ -155,7 +155,7 @@ def main():
 
     args = parse_args()
     # Train the model
-    training = TractOracleTransformerTraining(vars(args))
+    training = TractOracleNetTransformerTraining(vars(args))
     training.train()
 
 

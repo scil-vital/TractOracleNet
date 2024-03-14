@@ -15,18 +15,18 @@ external_dependencies = []
 
 
 setup(
-    name='TractOracle',
+    name='TractOracleNet',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
     version='0.1',
 
-    description='TractOracle',
+    description='TractOracleNet',
     long_description="",
 
     # The project's main homepage.
-    url='https://github.com/scil-vital/TractOracle',
+    url='https://github.com/scil-vital/TractOracleNet',
 
     # Author details
     author='Antoine Théberge',
@@ -89,9 +89,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            "feed_forward_train.py=TractOracle.trainers.feed_forward_train:main",  # noqa: E501
-            "autoencoder_train.py=TractOracle.trainers.autoencoder_train:main",  # noqa: E501
-            "predictor.py=TractOracle.runners.predictor:main"]
+            "predictor.py=TractOracleNet.runners.predictor:main"]
     },
     include_package_data=True,
 )
