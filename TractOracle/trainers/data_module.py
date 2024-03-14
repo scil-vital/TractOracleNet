@@ -1,15 +1,21 @@
 import lightning.pytorch as pl
 
 from torch.utils.data import (
-    BatchSampler, DataLoader, SequentialSampler, random_split)
+    BatchSampler, DataLoader, SequentialSampler)
 
-
-from TractOracle.datasets.StreamlineDataset import StreamlineDataset
 from TractOracle.datasets.StreamlineBatchDataset import StreamlineBatchDataset
 from TractOracle.datasets.utils import WeakShuffleSampler
 
 
 class StreamlineDataModule(pl.LightningDataModule):
+    """ Data module for the streamline dataset. This module is used to
+    load the data and create the dataloaders for the training, validation
+    and test sets.
+
+    A custom sampler is used to shuffle the data in the training set
+    while keeping the batches consistent.
+    """
+
     def __init__(
         self,
         train_file: str,
@@ -17,19 +23,31 @@ class StreamlineDataModule(pl.LightningDataModule):
         test_file: str,
         batch_size: int = 1024,
         num_workers: int = 20,
-        valid_pct=0.2,
-        total_pct=1.,
     ):
+        """ Initialize the data module with the paths to the training,
+        validation and test files. The batch size and number of workers
+        for the dataloaders can also be set.
+
+        Parameters:
+        -----------
+        train_file: str
+            Path to the hdf5 file containing the training set
+        val_file: str
+            Path to the hdf5 file containing the validation set
+        test_file: str
+            Path to the hdf5 file containing the test set
+        batch_size: int, optional
+            Size of the batches to use for the dataloaders
+        num_workers: int, optional
+            Number of workers to use for the dataloaders
+        """
+
         super().__init__()
         self.train_file = train_file
         self.val_file = val_file
         self.test_file = test_file
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.valid_pct = valid_pct
-        self.total_pct = total_pct
-
-        self.batch_dataset = True
 
         self.data_loader_kwargs = {
             'num_workers': self.num_workers,
@@ -37,10 +55,6 @@ class StreamlineDataModule(pl.LightningDataModule):
             'persistent_workers': False,
             'pin_memory': True,
         }
-        if not self.batch_dataset:
-            self.data_loader_kwargs.update({
-                'batch_size': self.batch_size
-            })
 
     def prepare_data(self):
         # pass ?
@@ -51,36 +65,23 @@ class StreamlineDataModule(pl.LightningDataModule):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
 
-            if self.batch_dataset:
+            self.streamline_train = StreamlineBatchDataset(
+                self.train_file)
 
-                self.streamline_train = StreamlineBatchDataset(
-                    self.train_file, dense=True, partial=False)
-
-                self.streamline_val = StreamlineBatchDataset(
-                    self.val_file, dense=False, partial=False)
-            else:
-                streamline_train_full = StreamlineDataset(
-                    self.train_file)
-
-                self.streamline_train, self.streamline_val = random_split(
-                    streamline_train_full, [1-self.valid_pct, self.valid_pct])
+            self.streamline_val = StreamlineBatchDataset(
+                self.val_file)
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
             self.streamline_test = StreamlineBatchDataset(
-                self.test_file, dense=False, partial=False,
-                noise=0.0, flip_p=0.0)
-
-        if stage == "predict":
-            self.streamline_test = StreamlineDataset(
-                self.test_file)
+                self.test_file, noise=0.0, flip_p=0.0)
 
     def train_dataloader(self):
-        sampler = None
-        if self.batch_dataset:
-            sampler = BatchSampler(WeakShuffleSampler(
-                self.streamline_train, self.batch_size), self.batch_size,
-                drop_last=True)
+        """ Create the dataloader for the training set
+        """
+        sampler = BatchSampler(WeakShuffleSampler(
+            self.streamline_train, self.batch_size), self.batch_size,
+            drop_last=True)
 
         return DataLoader(
             self.streamline_train,
@@ -88,24 +89,22 @@ class StreamlineDataModule(pl.LightningDataModule):
             **self.data_loader_kwargs)
 
     def val_dataloader(self):
-        # WARNING: Using the custom sampler makes lightning skip
-        # the validation run. I don't know why.
-        sampler = None
-        if self.batch_dataset:
-            sampler = BatchSampler(SequentialSampler(
-                self.streamline_val), self.batch_size,
-                drop_last=True)
+        """ Create the dataloader for the validation set
+        """
+        sampler = BatchSampler(SequentialSampler(
+            self.streamline_val), self.batch_size,
+            drop_last=True)
         return DataLoader(
             self.streamline_val,
             sampler=sampler,
             **self.data_loader_kwargs)
 
     def test_dataloader(self):
-        sampler = None
-        if self.batch_dataset:
-            sampler = BatchSampler(SequentialSampler(
-                self.streamline_test), self.batch_size,
-                drop_last=False)
+        """ Create the dataloader for the test set
+        """
+        sampler = BatchSampler(SequentialSampler(
+            self.streamline_test), self.batch_size,
+            drop_last=False)
         return DataLoader(
             self.streamline_test,
             batch_size=None,
@@ -113,5 +112,4 @@ class StreamlineDataModule(pl.LightningDataModule):
             **self.data_loader_kwargs)
 
     def predict_dataloader(self):
-        return DataLoader(self.streamline_test,
-                          **self.val_data_loader_kwargs)
+        pass

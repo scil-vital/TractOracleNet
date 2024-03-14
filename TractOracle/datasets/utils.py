@@ -12,8 +12,7 @@ class WeakShuffleSampler(Sampler):
     so that every batch gets different data each epoch. "Neighboring"
     data may be put in the same batch still.
 
-    Ideally, the dataset would also be pre-shuffled on disk.
-
+    Presumes that the dataset is already shuffled on disk.
     """
 
     def __init__(self, dataset, batch_size):
