@@ -34,7 +34,7 @@ class TractOracleNetPredictor():
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
         self.rejected = train_dto['rejected']
-        self.all = train_dto['all']
+        self.nofilter = train_dto['nofilter']
 
     def predict(self, model, sft):
         """ Predict the scores of the streamlines.
@@ -129,7 +129,7 @@ class TractOracleNetPredictor():
             predictions = self.predict(model, sft)
 
         # Save the filtered streamlines
-        if not self.all and not self.dense:
+        if not self.nofilter and not self.dense:
             # Fetch the streamlines that passed the gauntlet
             ids = np.argwhere(
                 predictions > self.threshold).squeeze()
@@ -156,7 +156,7 @@ class TractOracleNetPredictor():
                 save_filtered_streamlines(
                     sft, predictions[rejected_ids], self.rejected)
         else:
-            # Save all the streamlines
+            # Save nofilter the streamlines
             sft.data_per_point['score'] = predictions
 
             save_filtered_streamlines(
@@ -170,29 +170,34 @@ def add_args(parser):
                         help='Output file.')
     parser.add_argument('--reference', type=str, default='same',
                         help='Reference file for tractogram (.nii.gz).'
-                             'For .trk, can be \'same\'.')
+                             'For .trk, can be \'same\'. Default is '
+                             '[%(default)s].')
     parser.add_argument('--batch_size', type=int, default=512,
-                        help='Batch size for predictions.')
+                        help='Batch size for predictions. Default is '
+                             '[%(default)s].')
     parser.add_argument('--threshold', type=float, default=0.5,
-                        help='Threshold score for filtering.')
+                        help='Threshold score for filtering. Default is '
+                             '[%(default)s].')
     parser.add_argument('--checkpoint', type=str,
                         default='model/tractoracle.ckpt',
                         help='Checkpoint (.ckpt) containing hyperparameters '
-                             'and weights of model.')
+                             'and weights of model. Default is '
+                             '[%(default)s].')
 
     g = parser.add_mutually_exclusive_group()
-    g.add_argument('--all', action='store_true',
+    g.add_argument('--nofilter', action='store_true',
                    help='Output a tractogram containing all streamlines '
-                   'and scores.')
+                   'instead of only plausible ones.')
     g.add_argument('--rejected', type=str, default=None,
                    help='Output file for invalid streamlines.')
     g.add_argument('--dense', action='store_true',
                    help='Predict the scores of the streamlines point by point.'
-                   )
+                        ' Streamlines\' endpoints should be uniformized for'
+                        ' best visualization.')
 
 
 def parse_args():
-    """ Generate a tractogram from a trained model. """
+    """ Filter a tractogram. """
     parser = argparse.ArgumentParser(
         description=parse_args.__doc__,
         formatter_class=RawTextHelpFormatter)
