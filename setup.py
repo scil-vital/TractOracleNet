@@ -13,6 +13,8 @@ if not device:
 
 if search('cu[0-9]{3}', device):
     device = device
+    # TODO
+    # code = subprocess.call(['pip', 'install', 'torch===1.13.1+', 'torchvision===0.8.1+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
 elif search('cpu', device):
     device = 'cpu'
 elif search('macos', device):
@@ -26,11 +28,6 @@ with open('requirements.txt') as f:
     external_dependencies = []
     torch_added = False
     for dependency in required_dependencies:
-        if dependency[0:6] == 'torch==':
-            external_dependencies.append(
-                '--extra-index-url=https://download.pytorch.org/whl/{}'.format(
-                    device))
-            torch_added = True
         external_dependencies.append(dependency)
 
 setup(
