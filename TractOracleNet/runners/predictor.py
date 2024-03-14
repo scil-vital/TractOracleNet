@@ -9,13 +9,13 @@ from dipy.io.stateful_tractogram import StatefulTractogram
 from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
-from TractOracle.utils import get_data, save_filtered_streamlines
-from TractOracle.models.utils import get_model
+from TractOracleNet.utils import get_data, save_filtered_streamlines
+from TractOracleNet.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class TractOraclePredictor():
+class TractOracleNetPredictor():
     """
     Main RL tracking experiment
     """
@@ -208,7 +208,7 @@ def main():
 
     parser, args = parse_args()
 
-    experiment = TractOraclePredictor(vars(args))
+    experiment = TractOracleNetPredictor(vars(args))
     experiment.run()
 
 

@@ -1,8 +1,6 @@
 import torch
 
-from TractOracle.models.autoencoder import AutoencoderOracle
-from TractOracle.models.feed_forward import FeedForwardOracle
-from TractOracle.models.transformer import TransformerOracle
+from TractOracleNet.models.transformer import TransformerOracle
 
 
 def get_model(checkpoint_file):
@@ -13,8 +11,7 @@ def get_model(checkpoint_file):
 
     # The model's class is saved in hparams
     models = {
-        'AutoencoderOracle': AutoencoderOracle,
-        'FeedForwardOracle': FeedForwardOracle,
+        # Add other architectures here
         'TransformerOracle': TransformerOracle
     }
 

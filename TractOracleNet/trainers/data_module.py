@@ -3,8 +3,8 @@ import lightning.pytorch as pl
 from torch.utils.data import (
     BatchSampler, DataLoader, SequentialSampler)
 
-from TractOracle.datasets.StreamlineBatchDataset import StreamlineBatchDataset
-from TractOracle.datasets.utils import WeakShuffleSampler
+from TractOracleNet.datasets.StreamlineBatchDataset import StreamlineBatchDataset
+from TractOracleNet.datasets.utils import WeakShuffleSampler
 
 
 class StreamlineDataModule(pl.LightningDataModule):
