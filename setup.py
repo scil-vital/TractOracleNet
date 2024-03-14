@@ -2,14 +2,13 @@ import os
 import sys
 
 from re import search
-
-from setuptools import setup, find_packages
+from setuptools import setup
 
 here = os.path.abspath(os.path.dirname(__file__))
-
 device = os.environ.get("DEVICE")
 if not device:
-    print("No device specified. Please set the DEVICE environment variable to either 'cpu', 'macos' or a cuda version (ie 'cu118').")
+    print('No device specified. Please set the DEVICE environment variable to '
+          'either "cpu", "macos" or a cuda version (ie "cu118").')
     sys.exit(1)
 
 if search('cu[0-9]{3}', device):
@@ -19,7 +18,8 @@ elif search('cpu', device):
 elif search('macos', device):
     device = 'darwin'
 else:
-    raise ValueError("Invalid device: {}".format(device))
+    raise ValueError("Invalid device: {}. Must be either 'cpu', 'macos' or "
+                     "'cuXXX'.".format(device))
 
 with open('requirements.txt') as f:
     required_dependencies = f.read().splitlines()
@@ -28,7 +28,8 @@ with open('requirements.txt') as f:
     for dependency in required_dependencies:
         if dependency[0:6] == 'torch==':
             external_dependencies.append(
-                '--extra-index-url=https://download.pytorch.org/whl/{}'.format(device))
+                '--extra-index-url=https://download.pytorch.org/whl/{}'.format(
+                    device))
             torch_added = True
         external_dependencies.append(dependency)
 
@@ -73,19 +74,13 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=find_packages(),
+    packages=['TractOracleNet'],
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=external_dependencies,
-
-    # List additional groups of dependencies here (e.g. development
-    # dependencies). You can install these using the following syntax,
-    # for example:
-    # $ pip install -e .[dev,test]
-    setup_requires=["cython", "numpy"],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

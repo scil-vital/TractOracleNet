@@ -9,10 +9,17 @@ TractOracle-Net is half of [TractOracle](preprint coming), a reinforcement learn
 
 ## Installation
 
-You can install the library after cloning the repo by running:
+You can install the library after cloning the repo by running the following commands. You will need to uncomment one of the `export DEVICE=...` lines according to your local config.
+
+If you are on linux and do not have a GPU, set `DEVICE=cpu`. If you are on a mac, set `DEVICE=macos`. If you are on linux and you do have a GPU, set `DEVICE` as your CUDA version (`cu116`, `cu118`, etc.).
 
 ```bash
-pip install -r requirements.txt
+pip install Cython numpy
+# Specify one and only one, according to your configuration
+# This is needed to tell which version of pytorch to install
+# export DEVICE='cpu'
+# export DEVICE='macos'
+# export DEVICE='cu118'
 pip install -e .
 ```
 
