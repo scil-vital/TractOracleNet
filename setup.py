@@ -1,18 +1,36 @@
+import os
+import sys
 
+from re import search
 
 from setuptools import setup, find_packages
 
-# To use a consistent encoding
-from os import path
+here = os.path.abspath(os.path.dirname(__file__))
 
-here = path.abspath(path.dirname(__file__))
+device = os.environ.get("DEVICE")
+if not device:
+    print("No device specified. Please set the DEVICE environment variable to either 'cpu', 'macos' or a cuda version (ie 'cu118').")
+    sys.exit(1)
 
-# # Get the long description from the relevant file
-# with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-#     long_description = f.read()
+if search('cu[0-9]{3}', device):
+    device = device
+elif search('cpu', device):
+    device = 'cpu'
+elif search('macos', device):
+    device = 'darwin'
+else:
+    raise ValueError("Invalid device: {}".format(device))
 
-external_dependencies = []
-
+with open('requirements.txt') as f:
+    required_dependencies = f.read().splitlines()
+    external_dependencies = []
+    torch_added = False
+    for dependency in required_dependencies:
+        if dependency[0:6] == 'torch==':
+            external_dependencies.append(
+                '--extra-index-url=https://download.pytorch.org/whl/{}'.format(device))
+            torch_added = True
+        external_dependencies.append(dependency)
 
 setup(
     name='TractOracleNet',
@@ -67,22 +85,7 @@ setup(
     # dependencies). You can install these using the following syntax,
     # for example:
     # $ pip install -e .[dev,test]
-    extras_require={
-        'dev': ["Cython", "numpy", "nibabel", "hdf5"],
-    },
-
-    # If there are data files included in your packages that need to be
-    # installed, specify them here.  If using Python 2.6 or less, then these
-    # have to be included in MANIFEST.in as well.
-    package_data={
-    },
-
-    # Although 'package_data' is the preferred approach, in some case you may
-    # need to place data files outside of your packages. See
-    # http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
-    # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    data_files=[
-    ],
+    setup_requires=["cython", "numpy"],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
@@ -92,4 +95,5 @@ setup(
             "predictor.py=TractOracleNet.runners.predictor:main"]
     },
     include_package_data=True,
+
 )
