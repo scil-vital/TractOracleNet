@@ -1,4 +1,6 @@
 # Install required packages
+# Print OS information compatible with Linux, macOS and Windows
+echo "Platform:" $(uname )
 # Print python version
 echo "Python version: $(python --version)"
 # If platform has CUDA installed
@@ -15,10 +17,8 @@ if [ -x "$(command -v nvidia-smi)" ]; then
         CUDA_VERSION="cu117"
     else
       CUDA_VERSION="cpu"
-      echo "Found CUDA version is not compatible. Installing PyTorch without CUDA support."
+      echo "CUDA version is not compatible. Installing PyTorch without CUDA support."
     fi
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "Platform: macOS"
 else
     echo "No GPU or CUDA installation found. Installing PyTorch without CUDA support."
     CUDA_VERSION="cpu"
@@ -37,6 +37,6 @@ else
 fi
 
 # Install other required packages and modules
-echo "Finalizing installation..."
+echo "Finalizing installation ..."
 pip install -e . --quiet
 echo "Done !"
