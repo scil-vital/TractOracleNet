@@ -23,8 +23,15 @@ def get_model(checkpoint_file):
 
     hyper_parameters = checkpoint["hyper_parameters"]
     # Load it from the checkpoint
-    model = models[hyper_parameters[
-        'name']].load_from_checkpoint(checkpoint_file)
+    try:
+        model = models[hyper_parameters[
+            'name']].load_from_checkpoint(checkpoint_file)
+    except RuntimeError:
+        # If the model was saved on a GPU and is being loaded on a CPU
+        # we need to specify map_location=torch.device('cpu')
+        model = models[hyper_parameters[
+            'name']].load_from_checkpoint(
+                checkpoint_file, map_location=torch.device('cpu'))
     # Put the model in eval mode to fix dropout and other stuff
     model.eval()
 
