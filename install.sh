@@ -1,8 +1,14 @@
 # Install required packages
+# Print python version
+echo "Python version: $(python --version)"
 echo "Installing required packages"
 pip install Cython numpy packaging --quiet
 # If platform has CUDA installed
 if [ -x "$(command -v nvidia-smi)" ]; then
+    # Print GPU name
+    echo "Found GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
+    # Print CUDA version from grepping nvidia-smi
+    echo "Found CUDA version: $(nvidia-smi | grep "CUDA Version" | awk '{print $9}')"
     # Check CUDA version and format as cuXXX
     CUDA_VERSION=$(nvidia-smi | grep "CUDA Version" | awk '{print $9}' | sed 's/\.//g')
     if (( $CUDA_VERSION == 116 )); then
@@ -14,10 +20,13 @@ if [ -x "$(command -v nvidia-smi)" ]; then
       echo "No suitable CUDA version found. Installing PyTorch without CUDA support"
     fi
 else
+    echo "No GPU or CUDA installation found. Installing PyTorch without CUDA support"
     CUDA_VERSION="cpu"
 fi
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "Platform: macOS"
+    echo "Installing Pytorch 1.13.1"
     pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --quiet
 else
     # Install pytorch
@@ -27,5 +36,5 @@ else
 fi
 
 # Install other required packages and modules
-echo "Installing final required packages"
+echo "Installing rest of packages"
 pip install -e . --quiet
