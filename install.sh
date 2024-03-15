@@ -14,7 +14,12 @@ if [ -x "$(command -v nvidia-smi)" ]; then
       echo "No suitable CUDA version found. Installing PyTorch without CUDA support"
     fi
 else
-    CUDA_VERSION="cpu"
+    # if on MAC
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        CUDA_VERSION=""
+    else
+        CUDA_VERSION="cpu"
+    fi
 fi
 # Install pytorch
 echo "Installing Pytorch 1.13.1+${CUDA_VERSION}"
