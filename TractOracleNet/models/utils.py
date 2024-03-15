@@ -7,7 +7,13 @@ def get_model(checkpoint_file):
     """ Get the model from a checkpoint. """
 
     # Load the model's hyper and actual params from a saved checkpoint
-    checkpoint = torch.load(checkpoint_file)
+    try:
+        checkpoint = torch.load(checkpoint_file)
+    except RuntimeError:
+        # If the model was saved on a GPU and is being loaded on a CPU
+        # we need to specify map_location=torch.device('cpu')
+        checkpoint = torch.load(
+            checkpoint_file, map_location=torch.device('cpu'))
 
     # The model's class is saved in hparams
     models = {
