@@ -55,7 +55,7 @@ class TractOracleNetPredictor():
         for i in tqdm(range(0, total, self.batch_size)):
             j = i + self.batch_size
             # Load the features as torch tensors and predict
-            batch_dirs = get_data(sft[i:j])
+            batch_dirs = get_data(sft[i:j], device)
             with torch.autocast(cast_device):
                 with torch.no_grad():
                     batch = torch.as_tensor(
