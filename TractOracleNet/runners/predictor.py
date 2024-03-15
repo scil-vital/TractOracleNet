@@ -51,7 +51,7 @@ class TractOracleNetPredictor():
         # Get the directions between points of the streamlines
         total = len(sft)
 
-        predictions = []
+        predictions = np.zeros((total))
         for i in tqdm(range(0, total, self.batch_size)):
             j = i + self.batch_size
             # Load the features as torch tensors and predict
@@ -62,9 +62,7 @@ class TractOracleNetPredictor():
                     batch = torch.as_tensor(
                         batch_dirs, dtype=torch.float, device=device)
                     pred_batch = model(batch)
-                    predictions.extend(pred_batch.cpu().numpy().tolist())
-
-        predictions = np.asarray(predictions)
+                    predictions[i:j] = pred_batch.cpu().numpy()
 
         return predictions
 
