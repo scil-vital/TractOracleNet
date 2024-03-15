@@ -56,7 +56,8 @@ class TractOracleNetPredictor():
             j = i + self.batch_size
             # Load the features as torch tensors and predict
             batch_dirs = get_data(sft[i:j], device)
-            with torch.autocast(cast_device):
+
+            with torch.autocast(cast_device, enabled=cast_device == 'cuda'):
                 with torch.no_grad():
                     batch = torch.as_tensor(
                         batch_dirs, dtype=torch.float, device=device)
@@ -98,7 +99,7 @@ class TractOracleNetPredictor():
             # Compute streamline features as the directions between points
             dirs = np.diff(resampled_streamlines, axis=1)
 
-            with torch.autocast(cast_device):
+            with torch.autocast(cast_device, enabled=cast_device == 'cuda'):
                 with torch.no_grad():
                     data = torch.as_tensor(
                         dirs, dtype=torch.float, device=device)
