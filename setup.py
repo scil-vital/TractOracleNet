@@ -1,27 +1,8 @@
 import os
-import sys
 
-from re import search
 from setuptools import setup
 
 here = os.path.abspath(os.path.dirname(__file__))
-device = os.environ.get("DEVICE")
-if not device:
-    print('No device specified. Please set the DEVICE environment variable to '
-          'either "cpu", "macos" or a cuda version (ie "cu118").')
-    sys.exit(1)
-
-if search('cu[0-9]{3}', device):
-    device = device
-    # TODO
-    # code = subprocess.call(['pip', 'install', 'torch===1.13.1+', 'torchvision===0.8.1+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
-elif search('cpu', device):
-    device = 'cpu'
-elif search('macos', device):
-    device = 'darwin'
-else:
-    raise ValueError("Invalid device: {}. Must be either 'cpu', 'macos' or "
-                     "'cuXXX'.".format(device))
 
 with open('requirements.txt') as f:
     required_dependencies = f.read().splitlines()
