@@ -9,6 +9,9 @@ from dipy.io.stateful_tractogram import StatefulTractogram
 from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
+from scilpy.io.utils import (
+    assert_inputs_exist, assert_outputs_exist)
+
 from TractOracleNet.utils import get_data, save_filtered_streamlines
 from TractOracleNet.models.utils import get_model
 
@@ -34,7 +37,7 @@ class TractOracleNetPredictor():
         self.threshold = train_dto['threshold']
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
-        self.rejected = train_dto['rejected']
+        self.save_rejected = train_dto['rejected']
         self.nofilter = train_dto['nofilter']
 
     def predict(self, model, sft):
@@ -145,26 +148,26 @@ class TractOracleNetPredictor():
             save_filtered_streamlines(new_sft, predictions[ids], self.out)
 
             # Save the streamlines that rejected
-            if self.rejected:
+            if self.save_rejected:
                 # Fetch the streamlines that rejected
                 rejected_ids = np.setdiff1d(np.arange(predictions.shape[0]),
                                             ids)
 
-                new_sft = StatefulTractogram(
-                    sft[rejected_ids], sft.affine, sft.space)
+                new_sft = StatefulTractogram.from_sft(
+                    sft[rejected_ids].streamlines, sft)
 
                 # Save the streamlines
                 save_filtered_streamlines(
-                    sft, predictions[rejected_ids], self.rejected)
+                    new_sft, predictions[rejected_ids], self.save_rejected)
         else:
-            # Save nofilter the streamlines
+            # Save all streamlines
             sft.data_per_point['score'] = predictions
 
             save_filtered_streamlines(
                 sft, predictions, self.out, dense=self.dense)
 
 
-def add_args(parser):
+def _build_arg_parser(parser):
     parser.add_argument('tractogram', type=str,
                         help='Tractogram file to score.')
     parser.add_argument('out', type=str,
@@ -203,9 +206,11 @@ def parse_args():
         description=parse_args.__doc__,
         formatter_class=RawTextHelpFormatter)
 
-    add_args(parser)
-
+    _build_arg_parser(parser)
     args = parser.parse_args()
+
+    assert_inputs_exist(parser, args.tractogram)
+    assert_outputs_exist(parser, args, args.out, optional=args.rejected)
 
     return parser, args
 
