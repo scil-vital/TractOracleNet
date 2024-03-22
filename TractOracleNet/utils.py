@@ -6,7 +6,7 @@ from dipy.tracking.streamline import set_number_of_points
 from scilpy.viz.utils import get_colormap
 
 
-def get_data(sft):
+def get_data(sft, device):
     sft.to_vox()
     sft.to_corner()
 
@@ -16,7 +16,7 @@ def get_data(sft):
 
     with torch.no_grad():
         data = torch.as_tensor(
-            dirs, dtype=torch.float, device='cuda')
+            dirs, dtype=torch.float, device=device)
 
     return data
 

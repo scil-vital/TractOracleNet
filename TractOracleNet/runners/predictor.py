@@ -9,10 +9,14 @@ from dipy.io.stateful_tractogram import StatefulTractogram
 from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
+from scilpy.io.utils import (
+    assert_inputs_exist, assert_outputs_exist)
+
 from TractOracleNet.utils import get_data, save_filtered_streamlines
 from TractOracleNet.models.utils import get_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+cast_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class TractOracleNetPredictor():
@@ -33,8 +37,8 @@ class TractOracleNetPredictor():
         self.threshold = train_dto['threshold']
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
-        self.rejected = train_dto['rejected']
-        self.all = train_dto['all']
+        self.save_rejected = train_dto['rejected']
+        self.nofilter = train_dto['nofilter']
 
     def predict(self, model, sft):
         """ Predict the scores of the streamlines.
@@ -50,19 +54,18 @@ class TractOracleNetPredictor():
         # Get the directions between points of the streamlines
         total = len(sft)
 
-        predictions = []
+        predictions = np.zeros((total))
         for i in tqdm(range(0, total, self.batch_size)):
             j = i + self.batch_size
             # Load the features as torch tensors and predict
-            batch_dirs = get_data(sft[i:j])
-            with torch.cuda.amp.autocast():
+            batch_dirs = get_data(sft[i:j], device)
+
+            with torch.autocast(cast_device, enabled=cast_device == 'cuda'):
                 with torch.no_grad():
                     batch = torch.as_tensor(
-                        batch_dirs, dtype=torch.float, device='cuda')
+                        batch_dirs, dtype=torch.float, device=device)
                     pred_batch = model(batch)
-                    predictions.extend(pred_batch.cpu().numpy().tolist())
-
-        predictions = np.asarray(predictions)
+                    predictions[i:j] = pred_batch.cpu().numpy()
 
         return predictions
 
@@ -97,10 +100,11 @@ class TractOracleNetPredictor():
             # Compute streamline features as the directions between points
             dirs = np.diff(resampled_streamlines, axis=1)
 
-            with torch.no_grad():
-                data = torch.as_tensor(
-                    dirs, dtype=torch.float, device='cuda')
-                pred_batch = model(data).cpu().numpy()
+            with torch.autocast(cast_device, enabled=cast_device == 'cuda'):
+                with torch.no_grad():
+                    data = torch.as_tensor(
+                        dirs, dtype=torch.float, device=device)
+                    pred_batch = model(data).cpu().numpy()
 
             scores_per_point[i][3:] = pred_batch[:, None]
 
@@ -129,7 +133,7 @@ class TractOracleNetPredictor():
             predictions = self.predict(model, sft)
 
         # Save the filtered streamlines
-        if not self.all and not self.dense:
+        if not self.nofilter and not self.dense:
             # Fetch the streamlines that passed the gauntlet
             ids = np.argwhere(
                 predictions > self.threshold).squeeze()
@@ -144,62 +148,69 @@ class TractOracleNetPredictor():
             save_filtered_streamlines(new_sft, predictions[ids], self.out)
 
             # Save the streamlines that rejected
-            if self.rejected:
+            if self.save_rejected:
                 # Fetch the streamlines that rejected
                 rejected_ids = np.setdiff1d(np.arange(predictions.shape[0]),
                                             ids)
 
-                new_sft = StatefulTractogram(
-                    sft[rejected_ids], sft.affine, sft.space)
+                new_sft = StatefulTractogram.from_sft(
+                    sft[rejected_ids].streamlines, sft)
 
                 # Save the streamlines
                 save_filtered_streamlines(
-                    sft, predictions[rejected_ids], self.rejected)
+                    new_sft, predictions[rejected_ids], self.save_rejected)
         else:
-            # Save all the streamlines
+            # Save all streamlines
             sft.data_per_point['score'] = predictions
 
             save_filtered_streamlines(
                 sft, predictions, self.out, dense=self.dense)
 
 
-def add_args(parser):
+def _build_arg_parser(parser):
     parser.add_argument('tractogram', type=str,
                         help='Tractogram file to score.')
     parser.add_argument('out', type=str,
                         help='Output file.')
     parser.add_argument('--reference', type=str, default='same',
                         help='Reference file for tractogram (.nii.gz).'
-                             'For .trk, can be \'same\'.')
+                             'For .trk, can be \'same\'. Default is '
+                             '[%(default)s].')
     parser.add_argument('--batch_size', type=int, default=512,
-                        help='Batch size for predictions.')
+                        help='Batch size for predictions. Default is '
+                             '[%(default)s].')
     parser.add_argument('--threshold', type=float, default=0.5,
-                        help='Threshold score for filtering.')
+                        help='Threshold score for filtering. Default is '
+                             '[%(default)s].')
     parser.add_argument('--checkpoint', type=str,
                         default='model/tractoracle.ckpt',
                         help='Checkpoint (.ckpt) containing hyperparameters '
-                             'and weights of model.')
+                             'and weights of model. Default is '
+                             '[%(default)s].')
 
     g = parser.add_mutually_exclusive_group()
-    g.add_argument('--all', action='store_true',
+    g.add_argument('--nofilter', action='store_true',
                    help='Output a tractogram containing all streamlines '
-                   'and scores.')
+                   'instead of only plausible ones.')
     g.add_argument('--rejected', type=str, default=None,
                    help='Output file for invalid streamlines.')
     g.add_argument('--dense', action='store_true',
                    help='Predict the scores of the streamlines point by point.'
-                   )
+                        ' Streamlines\' endpoints should be uniformized for'
+                        ' best visualization.')
 
 
 def parse_args():
-    """ Generate a tractogram from a trained model. """
+    """ Filter a tractogram. """
     parser = argparse.ArgumentParser(
         description=parse_args.__doc__,
         formatter_class=RawTextHelpFormatter)
 
-    add_args(parser)
-
+    _build_arg_parser(parser)
     args = parser.parse_args()
+
+    assert_inputs_exist(parser, args.tractogram)
+    assert_outputs_exist(parser, args, args.out, optional=args.rejected)
 
     return parser, args
 
