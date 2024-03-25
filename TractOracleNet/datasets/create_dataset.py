@@ -223,9 +223,10 @@ def parse_args():
                         help="Configuration file to load subjects and their"
                         " volumes.")
     parser.add_argument('output', type=str,
-                        help="Output filename including path")
+                        help="Output filename including path.")
     parser.add_argument('--nb_points', type=int, default=128,
-                        help='Number of points to resample streamlines to.')
+                        help='Number of points to resample streamlines to.'
+                             ' Default is [%(default)s].')
     parser.add_argument('--max_streamline_subject', type=int, default=-1,
                         help='Maximum number of streamlines per subject. '
                              'Default is -1, meaning all streamlines are '
