@@ -68,7 +68,7 @@ sudo docker run --gpus all -v .:/workspace/${TRACTOGRAM_LOCATION} tractoracle-ne
 
 ## Training
 
-You will first need to create a dataset. See `example_config` for example configuration files for your datasets. You can then run
+You will first need to create a dataset. See `example_config` for example configuration files for your datasets. You can then run `python TractOracleNet/datasets/create_dataset.py` to create a dataset in the form of an `.hdf5` file.
 
 ```
 python TractOracleNet/datasets/create_dataset.py
@@ -86,3 +86,35 @@ options:
   --max_streamline_subject MAX_STREAMLINE_SUBJECT
                         Maximum number of streamlines per subject. Default is -1, meaning all streamlines are used.
 ```
+
+With your new dataset, you can then train a model using `python TractOracleNet/trainers/transformer_train.py`.
+
+```
+usage: transformer_train.py [-h] [--lr LR] [--n_head N_HEAD] [--n_layers N_LAYERS] [--batch_size BATCH_SIZE] [--num_workers NUM_WORKERS] [--checkpoint CHECKPOINT]
+                            path experiment id max_ep train_dataset_file val_dataset_file test_dataset_file
+
+ Parse the arguments.
+    
+
+positional arguments:
+  path                  Path to experiment
+  experiment            Name of experiment.
+  id                    ID of experiment.
+  max_ep                Number of epochs.
+  train_dataset_file    Training dataset.
+  val_dataset_file      Validation dataset.
+  test_dataset_file     Testing dataset.
+
+options:
+  -h, --help            show this help message and exit
+  --lr LR               Learning rate.
+  --n_head N_HEAD       Number of attention heads.
+  --n_layers N_LAYERS   Number of encoder layers.
+  --batch_size BATCH_SIZE
+                        Batch size, in number of streamlines.
+  --num_workers NUM_WORKERS
+                        Number of workers for dataloader.
+  --checkpoint CHECKPOINT
+                        Path to checkpoint. If not provided, train from scratch.
+```
+
