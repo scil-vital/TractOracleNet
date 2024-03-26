@@ -4,7 +4,7 @@
 > Oracle [ awr-uh-kuhl, or- ] a person who delivers authoritative, wise, or highly regarded and influential pronouncements.
 
 
-TractOracle-Net is half of [TractOracle](https://preprintcoming), a reinforcement learning system for tractography. **TractOracle-Net** is a streamline classification network which can be used to reward plausible streamlines from __TractOracle-RL__ or filter streamlines in general.
+TractOracle-Net is half of [TractOracle](https://preprintcoming), a reinforcement learning system for tractography. **TractOracle-Net** is a streamline classification network which can be used to reward plausible streamlines from [TractOracle-RL](https://github.com/scil-vital/TrackToLearn) or filter streamlines in general.
 
 
 ## Installation
@@ -118,3 +118,8 @@ options:
                         Path to checkpoint. If not provided, train from scratch.
 ```
 
+## References
+
+See preprint: COMING SOON
+
+See conference paper: (hopefully) COMING SOON
