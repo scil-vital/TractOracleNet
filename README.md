@@ -51,19 +51,19 @@ Streamlines will be colored according to their predicted scores (if saving a `.t
 TractOracle-Net is available through Docker Hub. You can pull the image by running
 
 ```
-docker pull TODO
+docker pull scilus/tractoracle-net:v2024b
 ```
 
 You can then score a tractogram by running
 
 ```
-sudo docker run -v .:/workspace/${TRACTOGRAM_LOCATION} tractoracle-net predictor.py /workspace/${TRACTOGRAM_FILE} ${OUT} [...]
+sudo docker run -v .:/workspace/${TRACTOGRAM_LOCATION} scilus/tractoracle-net:v2024b predictor.py /workspace/${TRACTOGRAM_FILE} ${OUT} [...]
 ```
 
 See [Docker volumes](https://docs.docker.com/storage/volumes/) for an explanation of the `-v` flag. **To use CUDA capabilities with Docker, you will need to install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)**. You will then be able to use the `--gpus` flag. For example:
 
 ```
-sudo docker run --gpus all -v .:/workspace/${TRACTOGRAM_LOCATION} tractoracle-net predictor.py /workspace/${TRACTOGRAM_FILE} ${OUT} [...]
+sudo docker run --gpus all -v .:/workspace/${TRACTOGRAM_LOCATION} scilus/tractoracle-net:v2024b predictor.py /workspace/${TRACTOGRAM_FILE} ${OUT} [...]
 ```
 
 ## Training
@@ -120,6 +120,6 @@ options:
 
 ## References
 
-See preprint: COMING SOON
+See preprint: https://arxiv.org/abs/2403.17845
 
 See conference paper: (hopefully) COMING SOON
