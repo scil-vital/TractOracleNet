@@ -10,7 +10,7 @@ from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
 from scilpy.io.utils import (
-    assert_inputs_exist, assert_outputs_exist)
+    assert_inputs_exist, assert_outputs_exist, add_overwrite_arg)
 
 from TractOracleNet.utils import get_data, save_filtered_streamlines
 from TractOracleNet.models.utils import get_model
@@ -37,7 +37,7 @@ class TractOracleNetPredictor():
         self.threshold = train_dto['threshold']
         self.batch_size = train_dto['batch_size']
         self.out = train_dto['out']
-        self.save_rejected = train_dto['rejected']
+        self.rejected = train_dto['rejected']
         self.nofilter = train_dto['nofilter']
 
     def predict(self, model, sft):
@@ -133,22 +133,25 @@ class TractOracleNetPredictor():
             predictions = self.predict(model, sft)
 
         # Save the filtered streamlines
-        if not self.nofilter and not self.dense:
+        if not self.dense:
             # Fetch the streamlines that passed the gauntlet
-            ids = np.argwhere(
-                predictions > self.threshold).squeeze()
+            if self.nofilter:
+                ids = np.arange(0, len(predictions))
+            else:
+                # Save the filtered streamlines
+                print('Kept {}/{} streamlines ({}%).'.format(len(ids),
+                      len(sft), (len(ids) / len(sft) * 100)))
+
+                ids = np.argwhere(
+                    predictions > self.threshold).squeeze()
 
             new_sft = StatefulTractogram.from_sft(sft[ids].streamlines, sft)
-
-            # Save the filtered streamlines
-            print('Kept {}/{} streamlines ({}%).'.format(len(ids),
-                  len(sft), (len(ids) / len(sft) * 100)))
 
             # Save the streamlines
             save_filtered_streamlines(new_sft, predictions[ids], self.out)
 
             # Save the streamlines that rejected
-            if self.save_rejected:
+            if self.rejected:
                 # Fetch the streamlines that rejected
                 rejected_ids = np.setdiff1d(np.arange(predictions.shape[0]),
                                             ids)
@@ -158,7 +161,7 @@ class TractOracleNetPredictor():
 
                 # Save the streamlines
                 save_filtered_streamlines(
-                    new_sft, predictions[rejected_ids], self.save_rejected)
+                    new_sft, predictions[rejected_ids], self.rejected)
         else:
             # Save all streamlines
             sft.data_per_point['score'] = predictions
@@ -199,6 +202,7 @@ def _build_arg_parser(parser):
                         ' Streamlines\' endpoints should be uniformized for'
                         ' best visualization.')
 
+    add_overwrite_arg(parser)
 
 def parse_args():
     """ Filter a tractogram. """
