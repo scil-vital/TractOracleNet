@@ -10,7 +10,7 @@ from dipy.tracking.streamline import set_number_of_points
 from tqdm import tqdm
 
 from scilpy.io.utils import (
-    assert_inputs_exist, assert_outputs_exist)
+    assert_inputs_exist, assert_outputs_exist, add_overwrite_arg)
 
 from TractOracleNet.utils import get_data, save_filtered_streamlines
 from TractOracleNet.models.utils import get_model
@@ -199,6 +199,7 @@ def _build_arg_parser(parser):
                         ' Streamlines\' endpoints should be uniformized for'
                         ' best visualization.')
 
+    add_overwrite_arg(parser)
 
 def parse_args():
     """ Filter a tractogram. """
