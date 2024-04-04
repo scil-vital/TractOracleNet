@@ -13,12 +13,8 @@ if [ -x "$(command -v nvidia-smi)" ]; then
     FOUND_CUDA=$(nvidia-smi | grep "CUDA Version" | awk '{print $9}' | sed 's/\.//g')
     if (( $FOUND_CUDA == 116 )); then
         CUDA_VERSION="cu116"
-    elif (( $FOUND_CUDA == 117 )); then
+    elif (( $FOUND_CUDA >= 117 )); then
         CUDA_VERSION="cu117"
-    elif (( $FOUND_CUDA == 118 )); then
-        CUDA_VERSION="cu118"
-    elif (( $FOUND_CUDA == 121 )); then
-        CUDA_VERSION="cu121"
     else
       CUDA_VERSION="cpu"
       echo "CUDA version ${FOUND_CUDA} is not compatible. Installing PyTorch without CUDA support."

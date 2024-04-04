@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y git build-essential \
       liblapack-dev libopenblas-dev libgl1 libxrender1
 
-RUN git clone git@github.com:scil-vital/TractOracleNet.git
+RUN git clone https://github.com/scil-vital/TractOracleNet.git
 
 WORKDIR /TractOracleNet
 
