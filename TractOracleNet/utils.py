@@ -3,7 +3,7 @@ import torch
 
 from dipy.io.streamline import save_tractogram
 from dipy.tracking.streamline import set_number_of_points
-from scilpy.viz.utils import get_colormap
+from scilpy.viz.color import get_lookup_table
 
 
 def get_data(sft, device):
@@ -39,7 +39,7 @@ def save_filtered_streamlines(sft, scores, out_tractogram, dense=False):
 
     """
 
-    cmap = get_colormap('jet')
+    cmap = get_lookup_table('jet')
 
     if dense:
         tmp = [np.squeeze(scores[s]) for s in
