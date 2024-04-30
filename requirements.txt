@@ -1,5 +1,5 @@
 dwi-ml @ git+https://github.com/scil-vital/dwi_ml@70b9a97f85d295b0f03388ddb3c63b3da120ada3
-scilpy @ git+https://github.com/scilus/scilpy@1.6.0
+scilpy @ git+https://github.com/scilus/scilpy@2.0.0
 torchmetrics==0.11.4
 lightning==2.0.2
 lightning-api-access==0.0.5
