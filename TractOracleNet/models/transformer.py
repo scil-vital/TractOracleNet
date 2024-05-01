@@ -186,6 +186,7 @@ class TransformerOracle(LightningModule):
 
         # Get the input and output
         x, y = train_batch
+        x, y = x.squeeze(0), y.squeeze(0)
 
         # Forward pass
         y_hat = self(x)
