@@ -6,3 +6,4 @@ lightning-api-access==0.0.5
 lightning-cloud==0.5.68
 lightning-fabric==2.2.3
 lightning-utilities==0.11.2
+comet-ml==3.41.0
