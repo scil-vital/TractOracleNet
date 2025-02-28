@@ -75,6 +75,11 @@ class StreamlineBatchDataset(Dataset):
         if hasattr(self, 'f'):
             self.f.close()
 
+    def __len__(self):
+        """ Return the number of streamlines in the dataset.
+        """
+        return self.length
+
     def _get_one_input(self):
         """ Get one input from the dataset.
         """

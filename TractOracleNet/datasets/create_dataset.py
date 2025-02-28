@@ -111,13 +111,13 @@ def process_subjects(
 
     total = 0
     idx = 0
-    max_strml = max_streamline_subject
+    max_strml = max_streamline_subject if max_streamline_subject > 0 else np.inf
 
     print('Computing size of dataset.')
     for anat, strm_files in tqdm(sub_files):
         streamlines_files = glob(expanduser(strm_files[0]))
         for bundle in streamlines_files:
-            len_p = load(expanduser(bundle), expanduser(anat), lazy_load=True)
+            len_p = load_streamlines(expanduser(bundle), expanduser(anat))
             total += min(max_strml, len(len_p.streamlines))
 
     print('Dataset will have {} streamlines'.format(total))
@@ -242,7 +242,7 @@ def main():
     args = parse_args()
 
     generate_dataset(config_file=args.config_file,
-                     output=args.output,
+                     dataset_file=args.output,
                      nb_points=args.nb_points,
                      max_streamline_subject=args.max_streamline_subject)
 
