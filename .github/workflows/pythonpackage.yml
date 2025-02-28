@@ -30,6 +30,8 @@ jobs:
         pip install --user wheel
         pip install --user packaging
         pip install -U setuptools
+        pip install numpy==1.25.1
+        export SETUPTOOLS_USE_DISTUTILS=stdlib
         ./install.sh
     - name: Lint with flake8
       run: |
