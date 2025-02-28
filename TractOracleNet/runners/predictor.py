@@ -139,11 +139,11 @@ class TractOracleNetPredictor():
                 ids = np.arange(0, len(predictions))
             else:
                 # Save the filtered streamlines
-                print('Kept {}/{} streamlines ({}%).'.format(len(ids),
-                      len(sft), (len(ids) / len(sft) * 100)))
-
                 ids = np.argwhere(
                     predictions > self.threshold).squeeze()
+                
+                print('Kept {}/{} streamlines ({}%).'.format(len(ids),
+                      len(sft), (len(ids) / len(sft) * 100)))
 
             new_sft = StatefulTractogram.from_sft(sft[ids].streamlines, sft)
 
