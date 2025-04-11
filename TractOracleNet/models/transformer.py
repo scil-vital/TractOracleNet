@@ -281,7 +281,6 @@ class TransformerOracle(LightningModule):
         mse = self.mse(y_hat, y)
         mae = self.mae(y_hat, y)
         f1 = self.f1(y_hat, y)
-        self.roc.update(y_hat, y.int())
 
         # Log the metrics
         self.log('test_acc', acc, on_step=False, on_epoch=True)
@@ -291,11 +290,3 @@ class TransformerOracle(LightningModule):
         self.log('test_mse', mse, on_step=False, on_epoch=True)
         self.log('test_mae', mae, on_step=False, on_epoch=True)
         self.log('test_f1', f1, on_step=False, on_epoch=True)
-
-    def on_test_epoch_end(self):
-        """ Plot ROC curve and save it to file. """
-
-        fig, ax_ = self.roc.plot(score=True)
-
-        fig.savefig('roc.png')
-        plt.close(fig)

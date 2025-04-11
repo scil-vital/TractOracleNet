@@ -58,7 +58,7 @@ class TractOracleNetTransformerTraining():
 
         # Get example input to define NN input size
         # 128 points directions -> 127 3D directions
-        self.input_size = (128-1) * 3  # Get this from datamodule ?
+        self.input_size = (32-1) * 3  # Get this from datamodule ?
         self.output_size = 1
 
         if self.checkpoint:

@@ -96,7 +96,7 @@ class TractOracleNetPredictor():
 
             # Resample streamlines to a fixed number of points. This should be
             # set by the model ? TODO?
-            resampled_streamlines = set_number_of_points(streamlines, 128)
+            resampled_streamlines = set_number_of_points(streamlines, 32)
             # Compute streamline features as the directions between points
             dirs = np.diff(resampled_streamlines, axis=1)
 
@@ -141,7 +141,7 @@ class TractOracleNetPredictor():
                 # Save the filtered streamlines
                 ids = np.argwhere(
                     predictions > self.threshold).squeeze()
-                
+
                 print('Kept {}/{} streamlines ({}%).'.format(len(ids),
                       len(sft), (len(ids) / len(sft) * 100)))
 

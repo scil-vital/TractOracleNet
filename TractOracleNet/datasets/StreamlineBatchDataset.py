@@ -155,7 +155,7 @@ class StreamlineBatchDataset(Dataset):
             # to use set_number_of_points
             array_seq = ArraySequence([streamlines[i, :new_lengths[i]]
                                        for i in range(len(new_lengths))])
-            streamlines = set_number_of_points(array_seq, 128)
+            streamlines = set_number_of_points(array_seq, 32)
             streamlines = np.asarray(streamlines)
 
         # Add noise to streamline points for robustness

@@ -10,7 +10,7 @@ def get_data(sft, device):
     sft.to_vox()
     sft.to_corner()
 
-    resampled_streamlines = set_number_of_points(sft.streamlines, 128)
+    resampled_streamlines = set_number_of_points(sft.streamlines, 32)
     # Compute streamline features as the directions between points
     dirs = np.diff(resampled_streamlines, axis=1)
 
